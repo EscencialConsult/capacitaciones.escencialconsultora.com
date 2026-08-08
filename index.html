@@ -3,20 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Landing de prueba — Campaña</title>
+<title>Landing — Campaña Prueba Ago26</title>
 <style>
   :root {
-    --azul: #1a4fd6;
-    --azul-oscuro: #0f2f7a;
-    --gris-texto: #2b2b33;
-    --fondo: #f6f7fb;
+    --morado-fondo-1: #2a1150;
+    --morado-fondo-2: #1a0a33;
+    --morado-card: #3d1a6b;
+    --naranja: #ff8c1a;
+    --naranja-oscuro: #e57312;
+    --violeta-boton: #7b3fe4;
+    --violeta-boton-hover: #6a2fd0;
+    --texto-claro: #f5eefd;
+    --texto-secundario: #cbb8ea;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    background: var(--fondo);
-    color: var(--gris-texto);
+    background: radial-gradient(circle at 30% 20%, var(--morado-fondo-1), var(--morado-fondo-2));
+    color: var(--texto-claro);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -24,38 +29,84 @@
     padding: 24px;
   }
   .card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(15, 47, 122, 0.12);
+    background: var(--morado-card);
+    border: 1px solid rgba(255, 140, 26, 0.25);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
     padding: 40px;
     max-width: 440px;
     width: 100%;
+    position: relative;
+    overflow: hidden;
   }
-  h1 { font-size: 1.5rem; margin-bottom: 8px; }
-  p.subtitulo { color: #666; margin-bottom: 28px; font-size: 0.95rem; }
-  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 16px 0 6px; }
+  .card::before {
+    content: "🎃";
+    position: absolute;
+    top: -10px;
+    right: -6px;
+    font-size: 70px;
+    opacity: 0.18;
+    transform: rotate(12deg);
+  }
+  .badge {
+    display: inline-block;
+    background: var(--naranja);
+    color: #2a1150;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 8px;
+    line-height: 1.2;
+  }
+  h1 span { color: var(--naranja); }
+  p.subtitulo {
+    color: var(--texto-secundario);
+    margin-bottom: 28px;
+    font-size: 0.95rem;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 16px 0 6px;
+    color: var(--texto-claro);
+  }
   input {
     width: 100%;
     padding: 12px 14px;
-    border: 1px solid #dcdfe6;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 10px;
     font-size: 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--texto-claro);
   }
-  input:focus { outline: none; border-color: var(--azul); }
+  input::placeholder { color: rgba(245, 238, 253, 0.4); }
+  input:focus {
+    outline: none;
+    border-color: var(--naranja);
+    background: rgba(255, 255, 255, 0.1);
+  }
   button {
     width: 100%;
     margin-top: 24px;
     padding: 14px;
     border: none;
     border-radius: 10px;
-    background: var(--azul);
+    background: var(--violeta-boton);
     color: #fff;
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, transform 0.1s ease;
   }
-  button:hover { background: var(--azul-oscuro); }
+  button:hover { background: var(--violeta-boton-hover); }
+  button:active { transform: scale(0.98); }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
   #mensaje {
     margin-top: 18px;
@@ -63,35 +114,35 @@
     text-align: center;
     display: none;
   }
-  #mensaje.ok { color: #1a7a3a; display: block; }
-  #mensaje.error { color: #b3261e; display: block; }
+  #mensaje.ok { color: #6ee7a0; display: block; }
+  #mensaje.error { color: #ff8a8a; display: block; }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <h1>Quiero recibir la información</h1>
-  <p class="subtitulo">Dejanos tus datos y te contactamos.</p>
+  <span class="badge">🕸️ Oferta por tiempo limitado</span>
+  <h1>Truco o <span>Descuento</span></h1>
+  <p class="subtitulo">Dejanos tus datos y te contactamos con tu descuento exclusivo.</p>
 
   <form id="form-lead">
     <!--
       origen_campaña queda fijo acá, hardcodeado en la landing.
-      Cada landing nueva (o cada relanzamiento con templates nuevos)
-      cambia este único valor — ver docs/checklist-implementacion.md sección 10.
+      Tiene que matchear EXACTO con una fila de Config_Campañas.
     -->
     <input type="hidden" name="origen_campaña" value="campaña_prueba_ago26">
 
     <label for="nombre">Nombre</label>
-    <input type="text" id="nombre" name="nombre" required>
+    <input type="text" id="nombre" name="nombre" placeholder="Tu nombre" required>
 
     <label for="apellido">Apellido</label>
-    <input type="text" id="apellido" name="apellido" required>
+    <input type="text" id="apellido" name="apellido" placeholder="Tu apellido" required>
 
     <label for="email">Email</label>
-    <input type="email" id="email" name="email" required>
+    <input type="email" id="email" name="email" placeholder="tu@email.com" required>
 
     <label for="telefono">Teléfono (opcional)</label>
-    <input type="tel" id="telefono" name="datos_extra">
+    <input type="tel" id="telefono" name="datos_extra" placeholder="Opcional">
 
     <button type="submit" id="btn-enviar">Enviar</button>
     <div id="mensaje"></div>
@@ -99,9 +150,6 @@
 </div>
 
 <script>
-  // Reemplazar por la URL del Web App una vez deployado en Apps Script
-  // (Implementar > Nueva implementación > Aplicación web > Ejecutar como: yo,
-  // Quién tiene acceso: cualquier usuario).
   const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyg3QGXHpaNy3ecaalf_yq41xLohPFycZqmQl5VXyLtkPHxtJotoFKd_vkSzd6zWJbo1A/exec';
 
   const form = document.getElementById('form-lead');
@@ -117,9 +165,6 @@
     const datos = new URLSearchParams(new FormData(form));
 
     try {
-      // Se manda como URLSearchParams (application/x-www-form-urlencoded) a propósito:
-      // es un "simple request" para el navegador, así que no dispara un preflight OPTIONS,
-      // que Apps Script Web Apps no maneja. Con JSON + fetch normal, esto falla por CORS.
       const resp = await fetch(WEBAPP_URL, {
         method: 'POST',
         body: datos
