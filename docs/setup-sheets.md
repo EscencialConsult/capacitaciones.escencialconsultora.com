@@ -18,8 +18,18 @@ Mantenerlos en columnas separadas de la misma pestaña te permite editar un
 template o un timing **una sola vez** en su fila de campaña, sin tener que
 tocar cada lead uno por uno.
 
-## Fila de encabezados — pegar tal cual en la celda A1
+## Fila de encabezados — opción rápida: botón del menú
 
+Si ya pegaste `Code.gs` en Apps Script (ver `checklist-implementacion.md`),
+no hace falta copiar/pegar nada: **recargá la planilla** (F5) y va a
+aparecer un menú nuevo arriba de todo, **"⚙️ Sistema Landing"**. Click en
+**"Colocar encabezados"** y escribe los dos bloques solo, con fondo negro
+y letra blanca en negrita — igual que si lo hicieras a mano, pero sin
+errores de tipeo.
+
+## Fila de encabezados — a mano (alternativa)
+
+Si todavía no tenés `Code.gs` pegado, pegá esto tal cual en la celda A1.
 Es una sola fila que cubre las columnas A hasta AM (39 columnas en total,
 separadas por tabulador — al pegar en A1, Sheets las reparte solas en columnas):
 

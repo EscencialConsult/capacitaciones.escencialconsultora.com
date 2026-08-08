@@ -6,33 +6,45 @@ porque las dos "tocan" el mismo dominio:
 
 | DNS para... | Para qué sirve | Dónde se configura |
 |---|---|---|
-| **Hosting del sitio** | Que `capacitaciones.escencialconsultora.com` muestre la landing y el dashboard | Panel de DNS de tu dominio + panel de Vercel |
-| **Verificación de Brevo** | Que puedas mandar emails "en nombre de" ese dominio sin cSaer en spam | Panel de DNS de tu dominio + panel de Brevo |
+| **Hosting del sitio** | Que `capacitaciones.escencialconsultora.com` muestre la landing y el dashboard | Panel de DNS de tu dominio + panel de Netlify |
+| **Verificación de Brevo** | Que puedas mandar emails "en nombre de" ese dominio sin caer en spam | Panel de DNS de tu dominio + panel de Brevo |
 
 Son registros DNS distintos que conviven sin problema en el mismo dominio —
 no hace falta elegir uno u otro, se hacen los dos.
 
-## 1. Hosting: Vercel (recomendado, ya es parte de tu stack)
+## 1. Hosting: Netlify
 
-1. En [vercel.com](https://vercel.com), **Add New > Project** → importás el
-   repo `EscencialConsult/capacitaciones.escencialconsultora.com` (ya está
-   pusheado a GitHub).
-2. Como es un sitio estático (sin build), Vercel lo detecta solo — no hace
-   falta configurar ningún comando de build.
-3. Deploy. Te da una URL tipo `capacitaciones-escencialconsultora-com.vercel.app`
-   para probar antes de conectar el dominio propio.
-4. `Project Settings > Domains` → agregás `capacitaciones.escencialconsultora.com`.
-   Vercel te muestra el registro DNS exacto a crear (normalmente un `CNAME`
-   apuntando a `cname.vercel-dns.com`, porque es un subdominio, no el
-   dominio raíz).
+No hace falta cargar ninguna variable de entorno en Netlify para este
+proyecto: es HTML/JS puro, sin build ni funciones de servidor, así que no
+hay ningún paso de compilación donde una env var pudiera "inyectarse" en
+el código. El único valor que necesita el frontend (`WEBAPP_URL`) va
+escrito directo en `landing/index.html` y `dashboard/index.html` — y no
+es secreto: es la URL pública del Web App, visible igual en la pestaña de
+Red del navegador apenas la landing hace el POST. Lo que sí es secreto
+(API key de Brevo, remitente, clave del dashboard) vive únicamente en las
+Propiedades del script de Apps Script — nunca toca Netlify ni este repo.
+
+1. En [app.netlify.com](https://app.netlify.com) → **Add new site > Import
+   an existing project > GitHub** → elegís
+   `EscencialConsult/capacitaciones.escencialconsultora.com`.
+2. **Build command**: dejalo vacío. **Publish directory**: `.` (raíz del
+   repo) — no hay nada que compilar.
+3. Deploy. Te da una URL de prueba tipo `nombre-random.netlify.app`.
+4. `Site configuration > Domain management > Add a domain` → cargás
+   `capacitaciones.escencialconsultora.com`. Netlify te muestra el
+   registro DNS exacto a crear (para un subdominio, normalmente un
+   `CNAME` apuntando a `[tu-sitio].netlify.app`).
 5. Vas al panel de DNS donde administrás `escencialconsultora.com` y
    cargás ese registro.
-6. Esperás la propagación (minutos a un par de horas) — Vercel emite el
+6. Esperás la propagación (minutos a un par de horas) — Netlify emite el
    certificado SSL solo, no hay que hacer nada más.
 
 **Con esto, `/dashboard` funciona solo**: como es una carpeta con
-`index.html` adentro (`dashboard/index.html`), Vercel la sirve directo en
+`index.html` adentro (`dashboard/index.html`), Netlify la sirve directo en
 `capacitaciones.escencialconsultora.com/dashboard` sin configuración extra.
+
+**Deploy automático**: una vez conectado, cada `git push` a `main` dispara
+un deploy nuevo solo — no hace falta subir nada a mano desde Netlify.
 
 ## 2. Brevo: verificar el dominio para el remitente
 

@@ -13,7 +13,7 @@ tuyas — no puedo tocarlas desde acá).
 - [x] `templates-email/design-base-1/email.html` — diseño base reutilizable
 - [x] `docs/setup-sheets.md` — una sola pestaña `Datos`, con las columnas exactas de los bloques Leads y Config_Campañas
 - [x] `docs/setup-brevo.md` — pasos de cuenta, dominio y API key
-- [x] `docs/setup-hosting.md` — publicar en Vercel + conectar el dominio + verificar Brevo (dos DNS separados)
+- [x] `docs/setup-hosting.md` — publicar en Netlify + conectar el dominio + verificar Brevo (dos DNS separados)
 
 ## Paso a paso para dejarlo andando
 
@@ -74,7 +74,7 @@ tuyas — no puedo tocarlas desde acá).
     `enviarPendientes` y ejecutala manualmente desde el editor.
 
 11. **Publicar el sitio y conectar el dominio** → seguir `docs/setup-hosting.md`
-    (Vercel + DNS del hosting + DNS de verificación de Brevo — son dos
+    (Netlify + DNS del hosting + DNS de verificación de Brevo — son dos
     cosas separadas, no te saltees la aclaración del doc).
 
 12. **Probar el flujo completo**:

@@ -44,7 +44,7 @@ templates-email/          → diseños base reutilizables (URL fija en este mism
 docs/
   setup-sheets.md         → una sola pestaña "Datos", con las columnas exactas de cada bloque
   setup-brevo.md          → cuenta, dominio, API key
-  setup-hosting.md         → publicar en Vercel + conectar el dominio + verificar Brevo (dos DNS separados)
+  setup-hosting.md         → publicar en Netlify + conectar el dominio + verificar Brevo (dos DNS separados)
   checklist-implementacion.md → paso a paso para dejarlo funcionando hoy
 ```
 
@@ -60,7 +60,7 @@ docs/
 - **Un solo archivo `Code.gs`** en Apps Script, en vez de varios `.gs`
   separados por responsabilidad — mismo criterio de simplicidad.
 - **Repo conectado a GitHub** en `EscencialConsult/capacitaciones.escencialconsultora.com`,
-  pensado para publicarse en Vercel apuntando al dominio del mismo nombre.
+  pensado para publicarse en Netlify apuntando al dominio del mismo nombre.
 - **Dashboard protegido con clave**, no con login de Google — el Web App
   de Apps Script tiene que ser público (`Cualquier usuario`) para que la
   landing y el tracker de WhatsApp funcionen sin fricción, así que el

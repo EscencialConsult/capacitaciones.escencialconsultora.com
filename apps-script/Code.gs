@@ -473,3 +473,57 @@ function handleTrackerClick_(e) {
 
   return HtmlService.createHtmlOutput(html);
 }
+
+// ── Menú de la planilla: botón "Colocar encabezados" ─────────────
+// onOpen() se ejecuta solo cada vez que abrís la planilla en el navegador
+// (no hace falta correrlo a mano) y agrega un menú propio arriba de todo,
+// al lado de "Ayuda". Sirve para (re)generar los encabezados de los dos
+// bloques con el formato correcto sin copiar/pegar el texto con tabs.
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('⚙️ Sistema Landing')
+    .addItem('Colocar encabezados', 'colocarEncabezados')
+    .addToUi();
+}
+
+function colocarEncabezados() {
+  var sheet;
+  try {
+    sheet = getSheet_();
+  } catch (err) {
+    SpreadsheetApp.getUi().alert('Creá primero una pestaña llamada "' + SHEET_NAME + '" y volvé a tocar el botón.');
+    return;
+  }
+
+  const encabezadosLeads = [
+    'lead_id', 'timestamp', 'origen_campaña', 'nombre', 'apellido', 'email',
+    'datos_extra', 'fecha_envio_1', 'estado_1', 'fecha_envio_2', 'estado_2',
+    'fecha_envio_3', 'estado_3', 'fecha_envio_4', 'estado_4',
+    'contacto_confirmado_fecha', 'contacto_confirmado_paso'
+  ];
+
+  const encabezadosConfig = [
+    'origen_campaña', 'asesora_nombre', 'asesora_whatsapp', 'mensaje_whatsapp',
+    'offset_dias_1', 'template_base_1', 'contenido_1', 'asunto_1',
+    'offset_dias_2', 'template_base_2', 'contenido_2', 'asunto_2',
+    'offset_dias_3', 'template_base_3', 'contenido_3', 'asunto_3',
+    'offset_dias_4', 'template_base_4', 'contenido_4', 'asunto_4',
+    'activa'
+  ];
+
+  escribirEncabezados_(sheet, LEADS_COL_INICIO, encabezadosLeads);
+  escribirEncabezados_(sheet, CONFIG_COL_INICIO, encabezadosConfig);
+  sheet.setFrozenRows(1);
+
+  SpreadsheetApp.getUi().alert('Listo — encabezados colocados en la pestaña "' + SHEET_NAME + '".');
+}
+
+/** Escribe una fila de encabezados en la fila 1, con fondo negro y letra blanca en negrita. */
+function escribirEncabezados_(sheet, colInicio, encabezados) {
+  const rango = sheet.getRange(1, colInicio, 1, encabezados.length);
+  rango.setValues([encabezados]);
+  rango.setBackground('#000000');
+  rango.setFontColor('#ffffff');
+  rango.setFontWeight('bold');
+}
