@@ -534,7 +534,12 @@ function colocarEncabezados() {
   escribirEncabezados_(sheet, CONFIG_COL_INICIO, encabezadosConfig);
   sheet.setFrozenRows(1);
 
-  SpreadsheetApp.getUi().alert('Listo — encabezados colocados en la pestaña "' + SHEET_NAME + '".');
+  const seAgregoPrueba = agregarCampañaPruebaSiFalta_(sheet, encabezadosConfig);
+
+  SpreadsheetApp.getUi().alert(
+    'Listo — encabezados colocados en la pestaña "' + SHEET_NAME + '".' +
+    (seAgregoPrueba ? ' También se agregó la fila de campaña de prueba en Config_Campañas (fila 2).' : '')
+  );
 }
 
 /** Escribe una fila de encabezados en la fila 1, con fondo negro y letra blanca en negrita. */
@@ -544,4 +549,36 @@ function escribirEncabezados_(sheet, colInicio, encabezados) {
   rango.setBackground('#000000');
   rango.setFontColor('#ffffff');
   rango.setFontWeight('bold');
+}
+
+/**
+ * Si la fila 2 del bloque Config_Campañas está completamente vacía, la
+ * completa con una campaña de prueba lista para usar. Si ya hay algo
+ * cargado ahí (una campaña real), NO la toca — este botón nunca pisa
+ * datos existentes, solo rellena el hueco cuando está vacío.
+ * Devuelve true si escribió algo, false si no hizo falta.
+ */
+function agregarCampañaPruebaSiFalta_(sheet, encabezadosConfig) {
+  const ancho = CONFIG_COL_FIN - CONFIG_COL_INICIO + 1;
+  const filaExistente = sheet.getRange(2, CONFIG_COL_INICIO, 1, ancho).getValues()[0];
+  const yaHayDatos = filaExistente.some(function (v) { return v !== '' && v !== null; });
+  if (yaHayDatos) return false;
+
+  const valoresPrueba = {
+    'origen_campaña': 'campana_prueba_ago26',
+    'asesora_nombre': 'Facundo',
+    'asesora_whatsapp': '5493816643996',
+    'mensaje_whatsapp': 'Hola, quiero más info sobre la campaña',
+    'offset_dias_1': 0,
+    'contenido_1': 'Gracias por tu interés. Un asesor se va a contactar a la brevedad.',
+    'asunto_1': 'hola',
+    'activa': true
+  };
+
+  const fila = encabezadosConfig.map(function (campo) {
+    return valoresPrueba[campo] !== undefined ? valoresPrueba[campo] : '';
+  });
+
+  sheet.getRange(2, CONFIG_COL_INICIO, 1, ancho).setValues([fila]);
+  return true;
 }
