@@ -37,10 +37,12 @@ tuyas — no puedo tocarlas desde acá).
    > este archivo automáticamente cada vez que lo edites acá, sin copiar/pegar.
    > Se puede sumar en cualquier momento, no es bloqueante para arrancar hoy.
 
-4. **Cargar las credenciales de Brevo** → seguir `docs/setup-brevo.md`
-   (Propiedades del script: `BREVO_API_KEY`, `SENDER_EMAIL`, `SENDER_NAME`).
-   Para arrancar podés usar tu email personal como remitente de prueba —
-   el dominio propio se conecta después, sin tocar código (ver paso 11).
+4. **Cargar las credenciales de Brevo** → seguir `docs/setup-brevo.md`.
+   Van hardcodeadas en las 3 constantes al principio de `Code.gs`
+   (`BREVO_API_KEY`, `SENDER_EMAIL`, `SENDER_NAME`) — completalas **solo
+   en la copia pegada en el editor de Apps Script**, nunca en el archivo
+   de este repo. Para arrancar podés usar tu email personal como
+   remitente de prueba — el dominio propio se conecta después (paso 11).
 
 5. **Deployar el Web App**: `Implementar > Nueva implementación > Aplicación web`.
    - Ejecutar como: **Yo** (tu cuenta)

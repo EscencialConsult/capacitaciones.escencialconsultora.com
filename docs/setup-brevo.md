@@ -17,22 +17,33 @@ autenticación quedan atados a la cuenta, no conviene fragmentarlo).
 4. Generar una API key (`Settings > API Keys > Generate a new API key`).
    Copiala — la vas a necesitar para el paso siguiente.
 
-## Cargar las credenciales en Apps Script
+## Cargar las credenciales
 
-Una vez que el proyecto de Apps Script esté creado (ver checklist-implementacion.md):
+Decisión de Facundo: estas 3 van **hardcodeadas directo en `Code.gs`**, no
+en Propiedades del script. Al principio del archivo hay 3 constantes
+vacías a propósito:
 
-`Extensiones > Apps Script > ⚙️ Configuración del proyecto > Propiedades del script > Agregar propiedad del script`
+```javascript
+const BREVO_API_KEY = '';
+const SENDER_EMAIL = '';
+const SENDER_NAME = '';
+```
 
-Cargar estas 3 (más `WEBAPP_URL` que se agrega después del primer deploy):
+Completalas **solo en la copia pegada dentro del editor de Apps Script**
+— nunca en el archivo de este repo (el que se sube a GitHub se deja
+siempre vacío). Si en algún momento actualizás `Code.gs` desde acá y lo
+volvés a pegar entero en Apps Script, vas a tener que volver a completar
+estas 3 líneas — son 10 segundos, pero no te olvides.
 
-| Propiedad | Valor |
+| Constante | Valor |
 |---|---|
 | `BREVO_API_KEY` | la API key generada en el paso 4 |
 | `SENDER_EMAIL` | el email verificado en el paso 3 |
 | `SENDER_NAME` | el nombre verificado en el paso 3 |
 
-Nunca van hardcodeadas en el código — así el `.gs` se puede compartir o
-subir a un repo sin exponer nada.
+`WEBAPP_URL` y `DASHBOARD_SECRET` siguen yendo en Propiedades del script
+(`⚙️ Configuración del proyecto > Propiedades del script`) — esas si no
+tienen por qué vivir en el código.
 
 ## Probar que la API responde
 

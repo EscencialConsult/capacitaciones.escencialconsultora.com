@@ -41,6 +41,24 @@ const CONFIG_COL_FIN = 39;    // columna AM
 
 const MAX_PASOS = 4;
 
+// ── Credenciales de Brevo — completar ACÁ, directo en el editor de Apps
+// Script, después de pegar este archivo ──────────────────────────────
+//
+// Esta versión del archivo (la que vive en este repo y en GitHub) se deja
+// con los 3 valores vacíos A PROPÓSITO: no se sube la key real a un
+// repositorio remoto bajo ningún concepto, ni siquiera privado — un
+// commit con la key adentro queda en el historial de git para siempre,
+// recuperable aunque después se borre en un commit nuevo.
+//
+// Lo que sí hacés: pegás este archivo en Apps Script como siempre, y
+// COMPLETÁS estas 3 líneas de acá directo en esa copia del editor
+// (esa copia no se sube a ningún lado, es tuya y de Google nomás).
+// La próxima vez que actualice este archivo desde acá, vas a tener que
+// volver a completarlas — son solo 3 líneas, 10 segundos.
+const BREVO_API_KEY = '';  // ← pegá acá tu Clave API de Brevo (xkeysib-...)
+const SENDER_EMAIL = '';   // ← pegá acá el email del remitente verificado en Brevo
+const SENDER_NAME = '';    // ← pegá acá el nombre del remitente verificado en Brevo
+
 function getScriptProp_(key) {
   const value = PropertiesService.getScriptProperties().getProperty(key);
   if (!value) {
@@ -52,9 +70,9 @@ function getScriptProp_(key) {
   return value;
 }
 
-function getBrevoApiKey() { return getScriptProp_('BREVO_API_KEY'); }
-function getSenderEmail() { return getScriptProp_('SENDER_EMAIL'); }
-function getSenderName() { return getScriptProp_('SENDER_NAME'); }
+function getBrevoApiKey() { return BREVO_API_KEY || getScriptProp_('BREVO_API_KEY'); }
+function getSenderEmail() { return SENDER_EMAIL || getScriptProp_('SENDER_EMAIL'); }
+function getSenderName() { return SENDER_NAME || getScriptProp_('SENDER_NAME'); }
 function getWebAppUrl() { return getScriptProp_('WEBAPP_URL'); }
 function getDashboardSecret() { return getScriptProp_('DASHBOARD_SECRET'); }
 
