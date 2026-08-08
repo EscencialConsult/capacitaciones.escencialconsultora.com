@@ -1,9 +1,12 @@
 # Landing Automatizada con Envío de Emails y Confirmación de Contacto
 
 Sistema de landings conectadas a Google Sheets + Apps Script + Brevo, con
-hasta 4 emails de seguimiento por lead y tracking del click en WhatsApp.
-Plan de trabajo completo en `docs/` (basado en el documento original de
-Agosto 2026).
+hasta 4 emails de seguimiento por lead, tracking del click en WhatsApp, y
+un dashboard de estado. Plan de trabajo completo en `docs/` (basado en el
+documento original de Agosto 2026).
+
+**Publicado en:** `capacitaciones.escencialconsultora.com` (landing en `/`,
+dashboard de estado en `/dashboard`) — ver `docs/setup-hosting.md`.
 
 ## Arquitectura
 
@@ -17,6 +20,8 @@ Landing (HTML/JS) → doPost → Apps Script Web App → Google Sheets: pestaña
                                                      click en botón WhatsApp
                                                                   ▼
                                                      doGet (Tracker) → guarda click → wa.me
+
+Dashboard (HTML/JS, en /dashboard) → doGet(?vista=dashboard&clave=...) → JSON con el estado de cada campaña
 ```
 
 Plantillas de email: HTML versionado en GitHub (URL fija, se actualiza
@@ -32,12 +37,14 @@ una campaña sin duplicar nada) sin necesitar pestañas distintas. Ver
 ## Estructura de este repo
 
 ```
-landing/                  → landing de prueba (HTML/JS puro)
-apps-script/              → Code.gs (Receptor + Enviador + Tracker, un solo archivo), appsscript.json
-templates-email/          → diseños base reutilizables (van a GitHub con URL fija)
+landing/                  → landing (HTML/JS puro), publicada en /
+dashboard/                → panel de estado (HTML/JS puro), publicado en /dashboard
+apps-script/              → Code.gs (Receptor + Enviador + Tracker + endpoint del dashboard, un solo archivo), appsscript.json
+templates-email/          → diseños base reutilizables (URL fija en este mismo repo)
 docs/
   setup-sheets.md         → una sola pestaña "Datos", con las columnas exactas de cada bloque
   setup-brevo.md          → cuenta, dominio, API key
+  setup-hosting.md         → publicar en Vercel + conectar el dominio + verificar Brevo (dos DNS separados)
   checklist-implementacion.md → paso a paso para dejarlo funcionando hoy
 ```
 
@@ -52,11 +59,16 @@ docs/
   vista en un solo lugar.
 - **Un solo archivo `Code.gs`** en Apps Script, en vez de varios `.gs`
   separados por responsabilidad — mismo criterio de simplicidad.
-- **GitHub todavía no conectado** — se trabaja local por ahora; cuando se
-  decida conectar, las plantillas de `templates-email/` son lo único que
-  necesita URL pública fija.
+- **Repo conectado a GitHub** en `EscencialConsult/capacitaciones.escencialconsultora.com`,
+  pensado para publicarse en Vercel apuntando al dominio del mismo nombre.
+- **Dashboard protegido con clave**, no con login de Google — el Web App
+  de Apps Script tiene que ser público (`Cualquier usuario`) para que la
+  landing y el tracker de WhatsApp funcionen sin fricción, así que el
+  dashboard usa una clave (`DASHBOARD_SECRET`) que el navegador guarda
+  local y nunca queda escrita en el código público.
 
 ## Próximo paso
 
 Seguir `docs/checklist-implementacion.md` de punta a punta para tener el
-primer flujo de prueba funcionando (landing → Sheets → email → WhatsApp).
+primer flujo de prueba funcionando (landing → Sheets → email → WhatsApp →
+dashboard) y después publicarlo con `docs/setup-hosting.md`.

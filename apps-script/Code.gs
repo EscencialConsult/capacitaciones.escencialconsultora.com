@@ -20,6 +20,12 @@
  * una tercera pestaña): se ven en Apps Script > Ejecuciones, y además el
  * estado_N de la fila afectada queda marcado "error" para saber cuál falló.
  *
+ * El dashboard (dashboard/index.html, publicado en /dashboard del sitio)
+ * NO vive acá — es una página estática aparte que le pide los datos a
+ * este mismo Web App vía doGet(?vista=dashboard&clave=...) y los pinta
+ * del lado del cliente. Así "/dashboard" puede ser una ruta real del
+ * dominio publicado, aunque Apps Script no soporte rutas propias.
+ *
  * Ver docs/setup-sheets.md para la fila de encabezados lista para copiar.
  */
 
@@ -50,6 +56,7 @@ function getBrevoApiKey() { return getScriptProp_('BREVO_API_KEY'); }
 function getSenderEmail() { return getScriptProp_('SENDER_EMAIL'); }
 function getSenderName() { return getScriptProp_('SENDER_NAME'); }
 function getWebAppUrl() { return getScriptProp_('WEBAPP_URL'); }
+function getDashboardSecret() { return getScriptProp_('DASHBOARD_SECRET'); }
 
 function getSheet_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
@@ -328,13 +335,99 @@ function crearTriggerHorario() {
     .create();
 }
 
-// ── Script C — Tracker de contacto (doGet) ───────────────────────
-// Se ejecuta cuando el lead cliquea el botón de WhatsApp del email.
-// Registra el click (solo la primera vez) y redirige a WhatsApp real.
+// ── Script C — Tracker de contacto + Dashboard (doGet) ───────────
+// Un solo doGet, dos usos según el parámetro que llegue:
+//   ?id=...&paso=...      → Tracker: click de WhatsApp del email (Script C)
+//   ?vista=dashboard&clave=... → Dashboard: devuelve JSON con el estado
+//                                de las campañas, lo consume dashboard/index.html
 // Vive en el mismo Web App/deploy que el Receptor — Apps Script permite
 // doGet y doPost en el mismo proyecto sin problema.
 
 function doGet(e) {
+  if (e.parameter.vista === 'dashboard') {
+    return handleDashboard_(e);
+  }
+  return handleTrackerClick_(e);
+}
+
+/**
+ * Devuelve el resumen de campañas en JSON. Protegido con una clave
+ * (Propiedad del script DASHBOARD_SECRET) para que no cualquiera que
+ * adivine "?vista=dashboard" vea los datos de los leads — el Web App
+ * está deployado con acceso "Cualquier usuario" porque lo necesitan la
+ * landing y el tracker, así que esta es la única traba que tiene el
+ * dashboard. No es una autenticación fuerte, pero alcanza para que no
+ * quede la info abierta a cualquiera que pase por la URL.
+ */
+function handleDashboard_(e) {
+  var claveEsperada;
+  try {
+    claveEsperada = getDashboardSecret();
+  } catch (err) {
+    return jsonResponse_({ ok: false, error: 'Falta configurar DASHBOARD_SECRET en Propiedades del script.' });
+  }
+
+  if (!e.parameter.clave || e.parameter.clave !== claveEsperada) {
+    return jsonResponse_({ ok: false, error: 'No autorizado.' });
+  }
+
+  return jsonResponse_({ ok: true, campañas: obtenerResumenCampañas_() });
+}
+
+/** Arma, por cada fila de Config_Campañas, el conteo de leads y estados de esa campaña. */
+function obtenerResumenCampañas_() {
+  const sheet = getSheet_();
+  const bloqueLeads = leerBloque_(sheet, LEADS_COL_INICIO, LEADS_COL_FIN);
+  const bloqueConfig = leerBloque_(sheet, CONFIG_COL_INICIO, CONFIG_COL_FIN);
+
+  const resumenPorCampaña = {};
+
+  bloqueLeads.filas.forEach(function (fila) {
+    var campaña = fila[bloqueLeads.idx['origen_campaña']];
+    if (!campaña) return;
+
+    if (!resumenPorCampaña[campaña]) {
+      resumenPorCampaña[campaña] = {
+        total: 0,
+        confirmados: 0,
+        pasos: {
+          1: { pendiente: 0, enviado: 0, error: 0, 'n/a': 0 },
+          2: { pendiente: 0, enviado: 0, error: 0, 'n/a': 0 },
+          3: { pendiente: 0, enviado: 0, error: 0, 'n/a': 0 },
+          4: { pendiente: 0, enviado: 0, error: 0, 'n/a': 0 }
+        }
+      };
+    }
+
+    var r = resumenPorCampaña[campaña];
+    r.total++;
+    if (fila[bloqueLeads.idx['contacto_confirmado_fecha']]) r.confirmados++;
+
+    for (var n = 1; n <= MAX_PASOS; n++) {
+      var estado = fila[bloqueLeads.idx['estado_' + n]] || 'n/a';
+      if (r.pasos[n][estado] === undefined) r.pasos[n][estado] = 0;
+      r.pasos[n][estado]++;
+    }
+  });
+
+  return bloqueConfig.filas
+    .map(function (fila) {
+      var campaña = fila[bloqueConfig.idx['origen_campaña']];
+      if (!campaña) return null; // fila vacía del bloque, no es una campaña real
+
+      return {
+        origen_campaña: campaña,
+        activa: String(fila[bloqueConfig.idx['activa']]).toUpperCase() === 'TRUE',
+        asesora_nombre: fila[bloqueConfig.idx['asesora_nombre']] || '',
+        total_leads: (resumenPorCampaña[campaña] || { total: 0 }).total,
+        confirmados_whatsapp: (resumenPorCampaña[campaña] || { confirmados: 0 }).confirmados,
+        pasos: (resumenPorCampaña[campaña] || { pasos: {} }).pasos
+      };
+    })
+    .filter(function (c) { return c !== null; });
+}
+
+function handleTrackerClick_(e) {
   const leadId = e.parameter.id;
   const paso = e.parameter.paso || '';
 

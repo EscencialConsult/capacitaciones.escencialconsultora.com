@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Estado de campañas</title>
+<style>
+  :root {
+    --azul: #1a4fd6;
+    --verde: #1a7a3a;
+    --gris: #999;
+    --rojo: #b3261e;
+    --fondo: #f4f5f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo);
+    color: #2b2b33;
+    padding: 32px 24px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  p.sub { color: #777; font-size: 0.9rem; margin-top: 0; }
+
+  /* Pantalla de clave */
+  #login {
+    max-width: 360px;
+    margin: 80px auto;
+    background: #fff;
+    border-radius: 14px;
+    padding: 32px;
+    box-shadow: 0 10px 30px rgba(15,47,122,0.1);
+  }
+  #login input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #dcdfe6;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-top: 12px;
+  }
+  #login button {
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--azul);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #login .error { color: var(--rojo); font-size: 0.85rem; margin-top: 10px; display: none; }
+
+  /* Tabla de resultados */
+  #panel { display: none; max-width: 1100px; margin: 0 auto; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .toolbar button {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #555;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 0.85rem;
+  }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eee; }
+  th { background: var(--azul); color: #fff; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: bold;
+    color: #fff;
+  }
+  .badge.activa { background: var(--verde); }
+  .badge.inactiva { background: var(--gris); }
+  .paso { font-size: 0.78rem; color: #555; white-space: nowrap; }
+  #actualizado { font-size: 0.78rem; color: #999; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- Pantalla de clave: la clave NUNCA queda escrita en este archivo público,
+     el usuario la tipea y se guarda solo en su navegador (localStorage). -->
+<div id="login">
+  <h1>Dashboard</h1>
+  <p class="sub">Ingresá la clave de acceso para ver el estado de las campañas.</p>
+  <input type="password" id="clave" placeholder="Clave de acceso" autocomplete="off">
+  <button id="btn-entrar">Entrar</button>
+  <div class="error" id="login-error">Clave incorrecta.</div>
+</div>
+
+<div id="panel">
+  <div class="toolbar">
+    <div>
+      <h1>Estado de campañas</h1>
+      <p class="sub">Landing Automatizada — capacitaciones.escencialconsultora.com</p>
+    </div>
+    <div>
+      <button id="btn-actualizar">↻ Actualizar</button>
+      <button id="btn-salir">Cambiar clave</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Campaña</th>
+        <th>Estado</th>
+        <th>Asesora</th>
+        <th>Leads</th>
+        <th>Confirmados WhatsApp</th>
+        <th>Paso 1</th>
+        <th>Paso 2</th>
+        <th>Paso 3</th>
+        <th>Paso 4</th>
+      </tr>
+    </thead>
+    <tbody id="tbody-campañas"></tbody>
+  </table>
+
+  <div id="actualizado"></div>
+</div>
+
+<script>
+  // Reemplazar por la URL del Web App una vez deployado en Apps Script
+  // (la misma que usa landing/index.html).
+  const WEBAPP_URL = 'https://script.google.com/macros/s/TU_DEPLOY_ID/exec';
+
+  const STORAGE_KEY = 'dashboard_clave';
+
+  const elLogin = document.getElementById('login');
+  const elPanel = document.getElementById('panel');
+  const elClave = document.getElementById('clave');
+  const elError = document.getElementById('login-error');
+  const elTbody = document.getElementById('tbody-campañas');
+  const elActualizado = document.getElementById('actualizado');
+
+  function formatearPaso(paso) {
+    if (!paso) return '—';
+    var partes = [];
+    if (paso.enviado) partes.push(paso.enviado + ' env.');
+    if (paso.pendiente) partes.push(paso.pendiente + ' pend.');
+    if (paso.error) partes.push(paso.error + ' err.');
+    return partes.length ? partes.join(' / ') : '—';
+  }
+
+  async function cargarDashboard(clave) {
+    elError.style.display = 'none';
+
+    const url = WEBAPP_URL + '?vista=dashboard&clave=' + encodeURIComponent(clave);
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.ok) {
+      elError.textContent = data.error || 'Clave incorrecta.';
+      elError.style.display = 'block';
+      localStorage.removeItem(STORAGE_KEY);
+      return false;
+    }
+
+    elTbody.innerHTML = data.campañas.map(function (c) {
+      return '<tr>' +
+        '<td>' + c.origen_campaña + '</td>' +
+        '<td><span class="badge ' + (c.activa ? 'activa' : 'inactiva') + '">' + (c.activa ? 'ACTIVA' : 'INACTIVA') + '</span></td>' +
+        '<td>' + (c.asesora_nombre || '—') + '</td>' +
+        '<td>' + c.total_leads + '</td>' +
+        '<td>' + c.confirmados_whatsapp + '</td>' +
+        '<td class="paso">' + formatearPaso(c.pasos[1]) + '</td>' +
+        '<td class="paso">' + formatearPaso(c.pasos[2]) + '</td>' +
+        '<td class="paso">' + formatearPaso(c.pasos[3]) + '</td>' +
+        '<td class="paso">' + formatearPaso(c.pasos[4]) + '</td>' +
+        '</tr>';
+    }).join('') || '<tr><td colspan="9" style="text-align:center;color:#999;">Todavía no hay campañas cargadas.</td></tr>';
+
+    elActualizado.textContent = 'Actualizado: ' + new Date().toLocaleString('es-AR');
+    elLogin.style.display = 'none';
+    elPanel.style.display = 'block';
+    localStorage.setItem(STORAGE_KEY, clave);
+    return true;
+  }
+
+  document.getElementById('btn-entrar').addEventListener('click', async () => {
+    const clave = elClave.value.trim();
+    if (!clave) return;
+    await cargarDashboard(clave);
+  });
+
+  elClave.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-entrar').click();
+  });
+
+  document.getElementById('btn-actualizar').addEventListener('click', () => {
+    const clave = localStorage.getItem(STORAGE_KEY);
+    if (clave) cargarDashboard(clave);
+  });
+
+  document.getElementById('btn-salir').addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    elPanel.style.display = 'none';
+    elLogin.style.display = 'block';
+    elClave.value = '';
+  });
+
+  // Si ya había una clave guardada de una visita anterior en este navegador,
+  // se usa directo sin volver a pedirla.
+  const claveGuardada = localStorage.getItem(STORAGE_KEY);
+  if (claveGuardada) {
+    cargarDashboard(claveGuardada);
+  }
+</script>
+
+</body>
+</html>
