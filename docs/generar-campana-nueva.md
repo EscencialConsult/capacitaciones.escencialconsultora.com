@@ -77,6 +77,15 @@ cada una antes de pasar a la siguiente:
    - Asunto del email.
    - Contenido/speech de ese paso puntual.
 
+   IMPORTANTE para los pasos que NO vayas a usar: en la fila de
+   Config_Campañas, `offset_dias_N`, `template_base_N`, `contenido_N` y
+   `asunto_N` de ese paso tienen que quedar TOTALMENTE VACÍOS — ni texto
+   de relleno, ni "N/A", ni un guion, nada. El sistema decide que un paso
+   no se manda mirando si `template_base_N` está vacío; si le ponés
+   cualquier texto ahí (aunque sea "N/A"), va a interpretar que SÍ hay
+   que mandar ese email, va a intentar descargar un template desde un
+   texto que no es una URL, y va a fallar.
+
 4. Por último, pedime que te adjunte una imagen o diseño de referencia de
    cómo querés que se vea visualmente el formulario de la landing (colores,
    estilo, campos visibles). Si no tengo nada específico, decime que dejás
