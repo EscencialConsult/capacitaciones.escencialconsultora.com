@@ -7,7 +7,7 @@ tuyas — no puedo tocarlas desde acá).
 ## Ya armado en `PROYECTOS LANDINGS/`
 
 - [x] Repo conectado y pusheado a `github.com/EscencialConsult/capacitaciones.escencialconsultora.com`
-- [x] `landing/index.html` — landing de prueba con formulario
+- [x] `index.html` — landing de prueba con formulario
 - [x] `dashboard/index.html` — panel de estado, pensado para publicarse en `/dashboard`
 - [x] `apps-script/Code.gs` — Script A (Receptor) + Script B (Enviador + Brevo) + Script C (Tracker) + endpoint del Dashboard, todo en un solo archivo
 - [x] `templates-email/design-base-1/email.html` — diseño base reutilizable
@@ -51,7 +51,7 @@ tuyas — no puedo tocarlas desde acá).
 
 6. **Cargar `WEBAPP_URL`** como Propiedad del script con esa URL recién copiada
    (necesaria para armar los links de tracking de WhatsApp y para que
-   `landing/index.html` y `dashboard/index.html` sepan a dónde pegarle).
+   `index.html` y `dashboard/index.html` sepan a dónde pegarle).
 
 7. **Cargar también `DASHBOARD_SECRET`** como Propiedad del script — inventate
    cualquier texto largo y random (ej. generado en un gestor de contraseñas).
@@ -59,7 +59,7 @@ tuyas — no puedo tocarlas desde acá).
    campañas — no la escribas en ningún archivo del repo.
 
 8. **Pegar `WEBAPP_URL`** en dos lugares:
-   - `landing/index.html`, línea `WEBAPP_URL`
+   - `index.html`, línea `WEBAPP_URL`
    - `dashboard/index.html`, línea `WEBAPP_URL`
 
 9. **Template del email**: por ahora podés probar sirviendo
@@ -80,7 +80,7 @@ tuyas — no puedo tocarlas desde acá).
     cosas separadas, no te saltees la aclaración del doc).
 
 12. **Probar el flujo completo**:
-    - Abrí la landing publicada (o `landing/index.html` local para probar rápido).
+    - Abrí la landing publicada (o `index.html` local para probar rápido).
     - Completá el formulario → verificá que aparece la fila en el bloque
       Leads (columnas A:Q) de la pestaña `Datos`.
     - Corré `enviarPendientes` manualmente → verificá `estado_1 = enviado`

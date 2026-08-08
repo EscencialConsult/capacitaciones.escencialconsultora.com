@@ -18,7 +18,7 @@ No hace falta cargar ninguna variable de entorno en Netlify para este
 proyecto: es HTML/JS puro, sin build ni funciones de servidor, así que no
 hay ningún paso de compilación donde una env var pudiera "inyectarse" en
 el código. El único valor que necesita el frontend (`WEBAPP_URL`) va
-escrito directo en `landing/index.html` y `dashboard/index.html` — y no
+escrito directo en `index.html` y `dashboard/index.html` — y no
 es secreto: es la URL pública del Web App, visible igual en la pestaña de
 Red del navegador apenas la landing hace el POST. Lo que sí es secreto
 (API key de Brevo, remitente, clave del dashboard) vive únicamente en las

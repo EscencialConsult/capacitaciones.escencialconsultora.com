@@ -37,7 +37,7 @@ una campaña sin duplicar nada) sin necesitar pestañas distintas. Ver
 ## Estructura de este repo
 
 ```
-landing/                  → landing (HTML/JS puro), publicada en /
+index.html                → landing (HTML/JS puro), publicada en la raíz del dominio (/)
 dashboard/                → panel de estado (HTML/JS puro), publicado en /dashboard
 apps-script/              → Code.gs (Receptor + Enviador + Tracker + endpoint del dashboard, un solo archivo), appsscript.json
 templates-email/          → diseños base reutilizables (URL fija en este mismo repo)
