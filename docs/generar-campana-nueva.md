@@ -29,7 +29,17 @@ cada una antes de pasar a la siguiente:
 
 2. Nombre y WhatsApp de la asesora asignada a esta campaña. El número va
    en formato internacional, sin + ni espacios ni guiones (ejemplo:
-   5493815551234).
+   5493815551234). Además, el texto que va a aparecer PRELLENADO en el
+   WhatsApp del LEAD cuando haga click en el botón del email — es un
+   mensaje redactado en primera persona, como si el LEAD se lo estuviera
+   escribiendo a la asesora (ejemplo: "Hola, quiero más info sobre la
+   campaña"). OJO, esto NO es un aviso automático que el sistema le manda
+   a la asesora — el sistema no manda WhatsApps por su cuenta, no tiene
+   esa capacidad. Lo único que hace solo es: cuando el lead clickea el
+   botón, se abre SU WhatsApp con este texto ya escrito, listo para que
+   él decida mandarlo. Lo que sí queda registrado automáticamente en la
+   planilla es la FECHA de ese click (columna contacto_confirmado_fecha),
+   para que la asesora sepa cuándo pasó.
 
 3. Para cada uno de los hasta 4 emails de seguimiento que quieras activar
    (podés usar 1, 2, 3 o los 4 — los que no uses se saltean solos):
@@ -230,3 +240,10 @@ de Apps Script.
   landing y la fila de `Config_Campañas`.
 - **El diseño va al final**: primero se resuelve la lógica, el diseño no
   tapa lo importante.
+- **`mensaje_whatsapp` explicado explícitamente**: sin el código del
+  Tracker (`doGet` en `Code.gs`), una IA asume por lógica de CRM típica
+  que es "un aviso a la asesora" — y no lo es. El sistema no manda
+  WhatsApps por su cuenta: arma un link `wa.me` con ese texto, y es el
+  LEAD quien lo manda (o no) desde su propio WhatsApp al clickear el
+  botón del email. Lo único automático es que la planilla registra
+  CUÁNDO clickeó, no que alguien reciba un aviso.
