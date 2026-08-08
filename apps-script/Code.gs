@@ -570,6 +570,7 @@ function agregarCampañaPruebaSiFalta_(sheet, encabezadosConfig) {
     'asesora_whatsapp': '5493816643996',
     'mensaje_whatsapp': 'Hola, quiero más info sobre la campaña',
     'offset_dias_1': 0,
+    'template_base_1': 'https://raw.githubusercontent.com/EscencialConsult/capacitaciones.escencialconsultora.com/main/templates-email/design-base-1/email.html',
     'contenido_1': 'Gracias por tu interés. Un asesor se va a contactar a la brevedad.',
     'asunto_1': 'hola',
     'activa': true
