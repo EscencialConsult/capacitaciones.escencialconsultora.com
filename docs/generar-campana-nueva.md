@@ -22,10 +22,17 @@ Envío de Emails" (repo: capacitaciones.escencialconsultora.com). Antes de
 generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a
 cada una antes de pasar a la siguiente:
 
-1. Nombre de la campaña — se usa como origen_campaña. Tiene que ser en
-   minúsculas, sin espacios ni acentos, palabras separadas por guion bajo,
-   terminado en mes+año abreviado. Ejemplo bueno: liquidacion_ago26.
-   ¿Cuál querés para esta?
+1. Primero: ¿esto es una campaña completamente NUEVA, o es un cambio de
+   diseño/contenido sobre una campaña que YA existe en tu Config_Campañas?
+   - Si es NUEVA: nombre de la campaña — se usa como origen_campaña.
+     Tiene que ser en minúsculas, sin espacios ni acentos, palabras
+     separadas por guion bajo, terminado en mes+año abreviado. Ejemplo
+     bueno: liquidacion_ago26. ¿Cuál querés para esta?
+   - Si es una EXISTENTE: pasame el origen_campaña EXACTO tal cual está
+     escrito en tu planilla (copiado y pegado, no re-tipeado — un nombre
+     parecido pero no idéntico, tipo "prueba_ago26" vs.
+     "campaña_prueba_ago26", hace que el sistema no la reconozca y
+     rompe todo el envío).
 
 2. Nombre y WhatsApp de la asesora asignada a esta campaña. El número va
    en formato internacional, sin + ni espacios ni guiones (ejemplo:
@@ -240,6 +247,11 @@ de Apps Script.
   landing y la fila de `Config_Campañas`.
 - **El diseño va al final**: primero se resuelve la lógica, el diseño no
   tapa lo importante.
+- **Pregunta "nueva vs. existente" al principio**: sin esto, es fácil
+  terminar con un `origen_campaña` parecido pero no idéntico al de una
+  fila que ya existe (ej. `prueba_ago26` vs. `campaña_prueba_ago26`) —
+  el sistema busca coincidencia EXACTA, así que un nombre "casi igual"
+  rompe el envío igual que uno completamente distinto.
 - **`mensaje_whatsapp` explicado explícitamente**: sin el código del
   Tracker (`doGet` en `Code.gs`), una IA asume por lógica de CRM típica
   que es "un aviso a la asesora" — y no lo es. El sistema no manda
