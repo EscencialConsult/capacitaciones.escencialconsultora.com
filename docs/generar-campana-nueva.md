@@ -13,12 +13,24 @@ lógica del POST — los copia de acá, no los inventa.
 > desincronizados.
 
 **Antes de usar este prompt por primera vez en una planilla**: los
-**títulos** de columna (fila 1, en los dos bloques) nunca se escriben a
-mano — se generan con el botón del menú **"⚙️ Sistema Landing" > "Colocar
-encabezados"** (aparece solo al abrir la planilla, viene incluido en
-`Code.gs`). Escribirlos a mano es donde se cuelan diferencias invisibles
-(un espacio de más, una "ñ" con otra codificación) que hacen que el
-sistema no reconozca la columna aunque se vea idéntica a simple vista.
+**títulos** de columna (fila 1, en los dos bloques) tienen que coincidir
+carácter por carácter con la lista de abajo. El menú **"⚙️ Sistema
+Landing" > "Colocar encabezados"** (incluido en `Code.gs`) los escribe
+solos y evita errores de tipeo, pero si preferís escribirlos a mano está
+bien igual — solo prestá atención a espacios de más y a que la "ñ" sea
+una letra normal (copiá y pegá desde acá en vez de re-tipear, para
+descartar diferencias invisibles):
+
+Bloque Leads (A:Q): `lead_id`, `timestamp`, `origen_campaña`, `nombre`,
+`apellido`, `email`, `datos_extra`, `fecha_envio_1`, `estado_1`,
+`fecha_envio_2`, `estado_2`, `fecha_envio_3`, `estado_3`, `fecha_envio_4`,
+`estado_4`, `contacto_confirmado_fecha`, `contacto_confirmado_paso`.
+
+Bloque Config_Campañas (S:AM): `origen_campaña`, `asesora_nombre`,
+`asesora_whatsapp`, `mensaje_whatsapp`, y por cada paso 1 a 4:
+`offset_dias_N`, `template_base_N`, `contenido_N`, `asunto_N` — termina
+en `activa`.
+
 Los títulos se tocan una sola vez por planilla; lo único que se agrega
 por campaña nueva es una **fila de datos** debajo de esos títulos.
 
@@ -255,13 +267,14 @@ de Apps Script.
 - **Ejemplo de `origen_campaña` incluido**: es el campo que más rompe
   cosas si queda mal escrito, porque tiene que matchear EXACTO entre la
   landing y la fila de `Config_Campañas`.
-- **Encabezados por botón, nunca a mano**: perdimos una sesión entera
+- **Encabezados carácter por carácter**: perdimos una sesión entera
   persiguiendo un "la campaña no existe" que en realidad era, primero,
   un encabezado tipeado con una letra distinta, y después directamente
   una fila de datos que se había borrado sin querer en medio del lío de
   arreglar encabezados a mano. El botón `colocarEncabezados` (menú
-  "⚙️ Sistema Landing") escribe siempre el texto exacto que el código
-  espera, sin margen para un espacio o una ñ mal codificada.
+  "⚙️ Sistema Landing") evita el problema de raíz porque escribe siempre
+  el texto exacto; si se hace a mano, copiar/pegar la lista del principio
+  de este doc en vez de re-tipear cumple lo mismo.
 - **El diseño va al final**: primero se resuelve la lógica, el diseño no
   tapa lo importante.
 - **Pregunta "nueva vs. existente" al principio**: sin esto, es fácil
