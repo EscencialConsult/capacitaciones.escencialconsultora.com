@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre.'),
@@ -24,7 +24,7 @@ export async function createEmailTemplate(_prevState: { error?: string } | undef
   const parsed = parse(formData);
   if ('error' in parsed) return { error: parsed.error };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from('email_templates').insert(parsed.data);
   if (error) {
     console.error('Error creando plantilla de email:', error);
@@ -43,7 +43,7 @@ export async function updateEmailTemplate(
   const parsed = parse(formData);
   if ('error' in parsed) return { error: parsed.error };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { error } = await supabase
     .from('email_templates')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -58,7 +58,7 @@ export async function updateEmailTemplate(
 }
 
 export async function toggleEmailTemplateActive(templateId: string, activar: boolean) {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   await supabase.from('email_templates').update({ is_active: activar }).eq('id', templateId);
   revalidatePath('/admin/email-templates');
 }

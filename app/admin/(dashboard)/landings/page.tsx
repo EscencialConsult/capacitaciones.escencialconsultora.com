@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { EnviarPendientesButton } from './EnviarPendientesButton';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ const badgeEstado: Record<string, string> = {
 };
 
 export default async function LandingsPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const { data: landings } = await supabase
     .from('landings')

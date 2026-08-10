@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
+import { NewCategoryModal } from './NewCategoryModal';
 
 type Categoria = { id: string; name: string };
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
@@ -43,6 +43,9 @@ export function TemplateForm({
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const [html, setHtml] = useState(valoresIniciales?.html_content ?? '');
+  const [listaCategorias, setListaCategorias] = useState(categorias);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   return (
     <form action={formAction} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -65,30 +68,46 @@ export function TemplateForm({
             <label className={etiqueta} htmlFor="category_id">
               Categoría
             </label>
-            <Link href="/admin/categories" prefetch={false} target="_blank" className="text-xs text-azul hover:underline">
-              ¿No está la que buscás? Crear categoría nueva ↗
-            </Link>
+            <button
+              type="button"
+              onClick={() => setModalAbierto(true)}
+              className="text-xs text-azul hover:underline"
+            >
+              ¿No está la que buscás? Crear categoría nueva
+            </button>
           </div>
           <select
             id="category_id"
             name="category_id"
-            defaultValue={valoresIniciales?.category_id ?? ''}
+            value={categoriaSeleccionada}
+            onChange={(e) => setCategoriaSeleccionada(e.target.value)}
             className={campo}
           >
             <option value="">— Sin categoría —</option>
-            {categorias.map((c) => (
+            {listaCategorias.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
-          {categorias.length === 0 && (
+          {listaCategorias.length === 0 && (
             <p className="mt-1 text-xs text-amber-600">
-              Todavía no hay ninguna categoría creada — podés dejar esto sin elegir y crear una desde el
-              link de arriba en cualquier momento.
+              Todavía no hay ninguna categoría creada — podés dejar esto sin elegir y crear una con el
+              botón de arriba.
             </p>
           )}
         </div>
+
+        {modalAbierto && (
+          <NewCategoryModal
+            onClose={() => setModalAbierto(false)}
+            onCreated={(categoria) => {
+              setListaCategorias((prev) => [...prev, categoria]);
+              setCategoriaSeleccionada(categoria.id);
+              setModalAbierto(false);
+            }}
+          />
+        )}
 
         <div>
           <label className={etiqueta} htmlFor="is_active">

@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EmailTemplatesPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { data: templates } = await supabase
     .from('email_templates')
     .select('id, name, is_active, updated_at')

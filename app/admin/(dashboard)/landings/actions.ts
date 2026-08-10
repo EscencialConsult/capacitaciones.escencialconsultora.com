@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { processPendingEmails } from '@/lib/email/process-pending';
 
 // Slugs que nunca pueden ser el nombre de una landing — colisionan con
@@ -44,7 +44,7 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
     return { error: 'El JSON de variables no es válido.' };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const { data: landing, error: landingError } = await supabase
     .from('landings')

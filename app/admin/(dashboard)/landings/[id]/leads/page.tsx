@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ const badgeEstado: Record<string, string> = {
 };
 
 export default async function LandingLeadsPage({ params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const [{ data: landing }, { data: leads }] = await Promise.all([
     supabase.from('landings').select('id, name, slug').eq('id', params.id).single(),

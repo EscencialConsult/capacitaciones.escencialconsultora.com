@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
@@ -42,7 +42,7 @@ export async function createTemplate(_prevState: { error?: string } | undefined,
   const parsed = parseTemplateForm(formData);
   if ('error' in parsed) return { error: parsed.error };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { error } = await supabase.from('landing_templates').insert(parsed.data);
 
   if (error) {
@@ -62,7 +62,7 @@ export async function updateTemplate(
   const parsed = parseTemplateForm(formData);
   if ('error' in parsed) return { error: parsed.error };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { error } = await supabase
     .from('landing_templates')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -83,7 +83,7 @@ export async function updateTemplate(
  * no queda con una referencia rota.
  */
 export async function toggleTemplateActive(templateId: string, activar: boolean) {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   await supabase.from('landing_templates').update({ is_active: activar }).eq('id', templateId);
   revalidatePath('/admin/templates');
 }

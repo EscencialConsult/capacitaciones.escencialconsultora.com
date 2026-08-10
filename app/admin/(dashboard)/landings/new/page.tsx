@@ -1,10 +1,10 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { NewLandingForm } from './NewLandingForm';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewLandingPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const [{ data: templates }, { data: emailTemplates }] = await Promise.all([
     supabase

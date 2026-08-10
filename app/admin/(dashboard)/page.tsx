@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminHomePage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const [
     { count: landingsActivas },

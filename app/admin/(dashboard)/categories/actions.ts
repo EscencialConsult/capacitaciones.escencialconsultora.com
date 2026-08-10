@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 // Rango Unicode U+0300-U+036F (diacríticos combinantes que aparecen tras
 // normalize('NFD')), armado con codepoints numéricos a propósito — nada
@@ -29,6 +29,11 @@ const schema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre.'),
 });
 
+/**
+ * Se llama desde el modal de TemplateForm — devuelve la categoría creada
+ * para que el formulario la agregue al selector al toque, sin recargar
+ * la página ni perder lo que ya se había tipeado en el resto del form.
+ */
 export async function createCategory(_prevState: { error?: string } | undefined, formData: FormData) {
   const parsed = schema.safeParse({ name: formData.get('name') });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
@@ -36,8 +41,12 @@ export async function createCategory(_prevState: { error?: string } | undefined,
   const slug = slugify(parsed.data.name);
   if (!slug) return { error: 'Ese nombre no genera un identificador válido, probá con otro.' };
 
-  const supabase = createSupabaseServerClient();
-  const { error } = await supabase.from('landing_categories').insert({ name: parsed.data.name, slug });
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('landing_categories')
+    .insert({ name: parsed.data.name, slug })
+    .select('id, name')
+    .single();
 
   if (error) {
     if (error.code === '23505') return { error: 'Ya existe una categoría con ese nombre.' };
@@ -45,24 +54,6 @@ export async function createCategory(_prevState: { error?: string } | undefined,
     return { error: 'No se pudo crear la categoría.' };
   }
 
-  revalidatePath('/admin/categories');
   revalidatePath('/admin/templates/new');
-  return { ok: true };
-}
-
-/** Solo se puede borrar si ninguna plantilla la está usando — no deja referencias rotas. */
-export async function deleteCategory(categoryId: string) {
-  const supabase = createSupabaseServerClient();
-
-  const { count } = await supabase
-    .from('landing_templates')
-    .select('*', { count: 'exact', head: true })
-    .eq('category_id', categoryId);
-
-  if ((count ?? 0) > 0) {
-    return { error: `No se puede borrar: ${count} plantilla(s) la están usando todavía.` };
-  }
-
-  await supabase.from('landing_categories').delete().eq('id', categoryId);
-  revalidatePath('/admin/categories');
+  return { ok: true as const, category: data };
 }

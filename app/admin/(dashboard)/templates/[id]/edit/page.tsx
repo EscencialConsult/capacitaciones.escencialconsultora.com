@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TemplateForm } from '../../TemplateForm';
 import { updateTemplate } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EditTemplatePage({ params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const [{ data: template }, { data: categorias }] = await Promise.all([
     supabase

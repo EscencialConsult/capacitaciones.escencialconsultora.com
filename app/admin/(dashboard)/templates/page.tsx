@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TemplatesPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const { data: templates } = await supabase
     .from('landing_templates')
