@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { NewCategoryModal } from './NewCategoryModal';
 import { CopyPromptButton } from './CopyPromptButton';
-import { VARIABLES_SCHEMA_FIJO, HTML_BASE } from '@/lib/landing-template-defaults';
+import { HTML_BASE } from '@/lib/landing-template-defaults';
 
 type Categoria = { id: string; name: string };
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
@@ -124,23 +124,6 @@ export function TemplateForm({
             <option value="true">Activa</option>
             <option value="false">Inactiva</option>
           </select>
-        </div>
-
-        <div>
-          <label className={etiqueta} htmlFor="variables_schema_json">
-            Variables editables (JSON)
-          </label>
-          <textarea
-            id="variables_schema_json"
-            name="variables_schema_json"
-            rows={4}
-            defaultValue={JSON.stringify(valoresIniciales?.variables_schema ?? VARIABLES_SCHEMA_FIJO, null, 2)}
-            className={`${campo} font-mono`}
-          />
-          <p className="mt-1 text-xs text-slate-400">
-            Son siempre las mismas 3 (título, subtítulo, texto del botón) — igual que en el sistema
-            viejo. Ya vienen precargadas; solo tocá esto si de verdad necesitás una variable distinta.
-          </p>
         </div>
 
         <div>

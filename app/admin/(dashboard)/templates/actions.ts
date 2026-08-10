@@ -4,15 +4,21 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { VARIABLES_SCHEMA_FIJO } from '@/lib/landing-template-defaults';
 
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
   category_id: z.string().uuid().optional().or(z.literal('')),
   html_content: z.string().min(1, 'Falta el HTML de la plantilla.'),
-  variables_schema_json: z.string().trim().min(1),
   is_active: z.enum(['true', 'false']),
 });
 
+/**
+ * Las variables (titulo, subtitulo, boton_texto) son siempre las mismas
+ * 3 — no dependen de lo que se tipee en el formulario, se fijan acá
+ * directo en el código. Así no hace falta mostrar un campo JSON editable
+ * en la interfaz para algo que en la práctica nunca cambia.
+ */
 function parseTemplateForm(formData: FormData) {
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const parsed = templateSchema.safeParse(raw);
@@ -20,19 +26,12 @@ function parseTemplateForm(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' } as const;
   }
 
-  let variables_schema: unknown;
-  try {
-    variables_schema = JSON.parse(parsed.data.variables_schema_json);
-  } catch {
-    return { error: 'El JSON de variables no es válido.' } as const;
-  }
-
   return {
     data: {
       name: parsed.data.name,
       category_id: parsed.data.category_id || null,
       html_content: parsed.data.html_content,
-      variables_schema,
+      variables_schema: VARIABLES_SCHEMA_FIJO,
       is_active: parsed.data.is_active === 'true',
     },
   } as const;
