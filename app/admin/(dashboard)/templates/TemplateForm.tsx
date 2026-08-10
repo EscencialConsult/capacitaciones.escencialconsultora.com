@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
 
 type Categoria = { id: string; name: string };
@@ -60,9 +61,14 @@ export function TemplateForm({
         </div>
 
         <div>
-          <label className={etiqueta} htmlFor="category_id">
-            Categoría
-          </label>
+          <div className="flex items-center justify-between">
+            <label className={etiqueta} htmlFor="category_id">
+              Categoría
+            </label>
+            <Link href="/admin/categories" prefetch={false} target="_blank" className="text-xs text-azul hover:underline">
+              ¿No está la que buscás? Crear categoría nueva ↗
+            </Link>
+          </div>
           <select
             id="category_id"
             name="category_id"
@@ -76,6 +82,12 @@ export function TemplateForm({
               </option>
             ))}
           </select>
+          {categorias.length === 0 && (
+            <p className="mt-1 text-xs text-amber-600">
+              Todavía no hay ninguna categoría creada — podés dejar esto sin elegir y crear una desde el
+              link de arriba en cualquier momento.
+            </p>
+          )}
         </div>
 
         <div>

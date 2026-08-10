@@ -6,6 +6,7 @@ const NAV = [
   { href: '/admin/landings', label: 'Landings' },
   { href: '/admin/templates', label: 'Plantillas de landing' },
   { href: '/admin/email-templates', label: 'Plantillas de email' },
+  { href: '/admin/categories', label: 'Categorías' },
   { href: '/admin/users', label: 'Usuarios' },
 ];
 
