@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { NewCategoryModal } from './NewCategoryModal';
+import { CopyPromptButton } from './CopyPromptButton';
+import { VARIABLES_SCHEMA_FIJO, HTML_BASE } from '@/lib/landing-template-defaults';
 
 type Categoria = { id: string; name: string };
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
@@ -42,7 +44,7 @@ export function TemplateForm({
   };
 }) {
   const [state, formAction] = useFormState(action, undefined);
-  const [html, setHtml] = useState(valoresIniciales?.html_content ?? '');
+  const [html, setHtml] = useState(valoresIniciales?.html_content ?? HTML_BASE);
   const [listaCategorias, setListaCategorias] = useState(categorias);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -132,19 +134,22 @@ export function TemplateForm({
             id="variables_schema_json"
             name="variables_schema_json"
             rows={4}
-            defaultValue={JSON.stringify(valoresIniciales?.variables_schema ?? [], null, 2)}
+            defaultValue={JSON.stringify(valoresIniciales?.variables_schema ?? VARIABLES_SCHEMA_FIJO, null, 2)}
             className={`${campo} font-mono`}
           />
           <p className="mt-1 text-xs text-slate-400">
-            Ej: {'[{"key":"titulo","label":"Título","type":"text"}]'} — estas claves son las que va a
-            poder completar quien cree una landing con esta plantilla.
+            Son siempre las mismas 3 (título, subtítulo, texto del botón) — igual que en el sistema
+            viejo. Ya vienen precargadas; solo tocá esto si de verdad necesitás una variable distinta.
           </p>
         </div>
 
         <div>
-          <label className={etiqueta} htmlFor="html_content">
-            HTML de la plantilla
-          </label>
+          <div className="flex items-center justify-between">
+            <label className={etiqueta} htmlFor="html_content">
+              HTML de la plantilla
+            </label>
+            <CopyPromptButton />
+          </div>
           <textarea
             id="html_content"
             name="html_content"
@@ -157,6 +162,10 @@ export function TemplateForm({
           <p className="mt-1 text-xs text-slate-400">
             HTML/CSS/JS autocontenido, sin React ni Tailwind — usá {'{{clave}}'} para los placeholders
             declarados arriba, más el reservado {'{{__landing_id__}}'} en el input oculto del formulario.
+            Ya arranca con la plantilla base del sistema viejo — lo único que tenés que subir/cambiar es
+            el HTML, el resto del funcionamiento (el fetch, el envío) es siempre el mismo. Si querés un
+            diseño distinto, copiá el prompt de arriba y pegáselo a una IA — te va a devolver el HTML
+            completo listo para pegar acá, sin tocar la lógica.
           </p>
         </div>
 
