@@ -1,5 +1,6 @@
 # Notas personales con configuración/credenciales — nunca se suben al repo
 CONFIGURACION-LOCAL.md
+netlify-env-para-importar.txt
 .env
 .env.*
 !.env.local.example
