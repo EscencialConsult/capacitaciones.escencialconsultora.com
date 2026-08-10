@@ -85,11 +85,14 @@ create table leads (
   utm_campaign text,
   whatsapp_clicked_at timestamptz,
   whatsapp_clicked_step int,
-  created_at timestamptz not null default now(),
-  unique (landing_id, lower(email))
+  created_at timestamptz not null default now()
 );
 
 create index leads_landing_idx on leads (landing_id);
+
+-- Dedupe real (no un loop en la app): Postgres no permite funciones
+-- dentro de un UNIQUE de tabla, por eso va como índice único aparte.
+create unique index leads_landing_email_unique_idx on leads (landing_id, lower(email));
 
 -- ── Cuentas de Brevo (modelo listo para rotación futura) ───────────
 -- La API key NUNCA vive acá — env_var_name apunta al nombre de la
