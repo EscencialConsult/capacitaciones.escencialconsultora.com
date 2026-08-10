@@ -98,20 +98,53 @@ export const HTML_BASE = `<!DOCTYPE html>
 </html>`;
 
 /**
- * Prompt autosuficiente para pedirle a cualquier IA un diseño nuevo de
- * plantilla, sin que tenga que adivinar la lógica del formulario —
- * mismo criterio que el prompt del sistema viejo (docs/generar-campana-nueva.md):
- * el HTML real va adentro, no descrito. Deja explícito que el diseño
- * visual es 100% libre — lo único fijo es cómo se envían los datos.
+ * UN SOLO prompt — mismo criterio que docs/generar-campana-nueva.md del
+ * sistema viejo: ahí un solo prompt pedía nombre de campaña, asesora,
+ * WhatsApp, timing/contenido de los 4 emails, Y el diseño, todo junto,
+ * y devolvía una fila de Sheets + un HTML. Acá no cambia el flujo de
+ * conversación con la IA — sigue siendo una sola tanda de preguntas —
+ * lo único que cambia es que el resultado final se reparte en dos
+ * lugares del panel en vez de un archivo y una fila: la plantilla
+ * (el HTML) va en /admin/templates/new, y el resto de los datos
+ * (asesora, WhatsApp, contenido de los emails) va en
+ * /admin/landings/new, donde esa landing se conecta a la plantilla que
+ * acabás de subir.
  */
-export function armarPromptPlantillaNueva() {
-  return `Necesito un diseño nuevo de landing para mi plataforma. Antes de generar nada, preguntame UNA COSA a la vez y esperá mi respuesta:
+export function armarPromptCampanaNueva() {
+  return `Necesito armar una landing nueva para mi plataforma. Antes de generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a cada una:
 
-1. ¿Qué estilo/tema visual querés? (colores, referencia de marca, humor de la campaña, etc.)
+1. Nombre de la landing — se usa como link (slug). Tiene que ser en minúsculas, sin espacios ni acentos, palabras separadas por guion, terminado en mes+año abreviado. Ejemplo bueno: liquidacion-ago26. Pedime también un nombre interno más descriptivo para identificarla en el panel.
 
-El HTML de abajo tiene SOLO la parte funcional (los campos del formulario y el script que manda los datos) — no tiene ningún diseño, ni colores, ni layout. Tu trabajo es vestirlo por completo: agregar el <style>, reorganizar el <body> como quieras (tarjeta centrada, fullscreen, lo que sea), tipografías, colores, animaciones. Tenés libertad total en lo visual.
+2. Nombre y WhatsApp de la asesora asignada. El número va en formato internacional, sin + ni espacios ni guiones (ejemplo: 5493815551234). Además, el texto que va a aparecer PRELLENADO en el WhatsApp del LEAD cuando haga click en el botón del email — un mensaje redactado en primera persona, como si el LEAD se lo estuviera escribiendo a la asesora (ejemplo: "Hola, quiero más info sobre la campaña"). OJO: esto NO es un aviso automático que el sistema le manda a la asesora — el sistema no manda WhatsApps por su cuenta. Lo único que hace es abrir el WhatsApp del lead con este texto ya escrito, listo para que él decida mandarlo.
 
-Lo único que NO podés tocar es la parte funcional: los inputs del formulario con sus atributos "name" exactos (nombre, apellido, email, phone, y el input oculto "landing_id"), el bloque <script> completo tal cual (hace el fetch a /api/leads con esos datos), y los 3 placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} — tienen que seguir estando en el HTML final, en algún lugar del diseño que armes, sin texto fijo reemplazándolos.
+3. Para cada uno de los hasta 4 emails de seguimiento que quieras activar (podés usar 1, 2, 3 o los 4 — el 1 es obligatorio, los demás se saltean solos si los dejás sin usar, no hace falta rellenar con texto tipo "N/A"):
+   - Días después del registro en que se manda (0 = inmediato).
+   - Asunto del email.
+   - Contenido/speech de ese paso puntual.
+
+4. Título, subtítulo y texto del botón que va a mostrar la landing.
+
+5. Por último, pedime el estilo/diseño visual que querés (colores, referencia de marca, humor de la campaña). Si no tengo nada específico, decime que uses cualquier estilo prolijo.
+
+Con esas respuestas, generame DOS cosas:
+
+A) El HTML completo de la landing. Partí EXACTAMENTE del HTML base de acá abajo — es la parte funcional real, ya probada (el formulario y el script que mandan los datos). NO toques los inputs, sus atributos "name", el input oculto "landing_id", ni el bloque <script>. Lo único que agregás es el diseño visual completo alrededor (agregá el <style>, reorganizá el <body> como quieras) según el punto 5, y dejá los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} tal cual, sin texto fijo reemplazándolos.
+
+B) Un resumen con el resto de los datos, en este formato exacto:
+
+---
+Título: ...
+Subtítulo: ...
+Texto del botón: ...
+Asesora — nombre: ...
+Asesora — WhatsApp: ...
+Mensaje prellenado de WhatsApp: ...
+
+Email 1 — días: ... / asunto: ... / contenido: ...
+Email 2 — días: ... / asunto: ... / contenido: ... (o "no usar")
+Email 3 — días: ... / asunto: ... / contenido: ... (o "no usar")
+Email 4 — días: ... / asunto: ... / contenido: ... (o "no usar")
+---
 
 HTML base (función fija, diseño libre):
 
@@ -119,5 +152,7 @@ HTML base (función fija, diseño libre):
 ${HTML_BASE}
 \`\`\`
 
-Cuando termines, dame el HTML completo (con tu diseño ya integrado) listo para pegar en el campo "HTML de la plantilla" del panel — nada más, sin explicaciones extra en el medio del código.`;
+Cuando termines, dame primero el HTML completo (A), y después el resumen (B) — nada de explicaciones extra en el medio.
+
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel; el resumen (B) lo uso para crear la landing y conectarla a esa plantilla.`;
 }
