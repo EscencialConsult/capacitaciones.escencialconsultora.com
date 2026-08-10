@@ -52,12 +52,14 @@ export default async function AdminHomePage() {
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href="/admin/landings/new"
+          prefetch={false}
           className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro"
         >
           + Nueva landing
         </Link>
         <Link
           href="/admin/templates/new"
+          prefetch={false}
           className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           + Nueva plantilla

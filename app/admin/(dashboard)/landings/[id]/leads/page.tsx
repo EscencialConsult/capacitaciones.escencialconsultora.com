@@ -24,7 +24,7 @@ export default async function LandingLeadsPage({ params }: { params: { id: strin
 
   return (
     <div>
-      <Link href="/admin/landings" className="text-sm text-azul hover:underline">
+      <Link href="/admin/landings" prefetch={false} className="text-sm text-azul hover:underline">
         ← Volver a landings
       </Link>
       <h1 className="mt-2 text-lg font-semibold text-slate-800">

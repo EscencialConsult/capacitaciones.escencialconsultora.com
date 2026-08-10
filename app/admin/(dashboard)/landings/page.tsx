@@ -27,6 +27,7 @@ export default async function LandingsPage() {
           <EnviarPendientesButton />
           <Link
             href="/admin/landings/new"
+          prefetch={false}
             className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro"
           >
             + Nueva landing
@@ -68,7 +69,7 @@ export default async function LandingsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/admin/landings/${l.id}/leads`} className="text-azul hover:underline">
+                    <Link href={`/admin/landings/${l.id}/leads`} prefetch={false} className="text-azul hover:underline">
                       Ver leads
                     </Link>
                   </td>

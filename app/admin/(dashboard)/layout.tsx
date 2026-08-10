@@ -15,7 +15,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/admin" className="font-semibold text-slate-800">
+            <Link href="/admin" prefetch={false} className="font-semibold text-slate-800">
               Escencial — Plataforma de Landings
             </Link>
             <form action={signOut}>
@@ -26,7 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <nav className="mt-3 flex flex-wrap items-center gap-5 text-sm text-slate-600">
             {NAV.map((item) => (
-              <Link key={item.href} href={item.href} className="hover:text-azul">
+              <Link key={item.href} href={item.href} prefetch={false} className="hover:text-azul">
                 {item.label}
               </Link>
             ))}

@@ -18,6 +18,7 @@ export default async function TemplatesPage() {
         <h1 className="text-lg font-semibold text-slate-800">Plantillas de landing</h1>
         <Link
           href="/admin/templates/new"
+          prefetch={false}
           className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro"
         >
           + Nueva plantilla
@@ -59,7 +60,7 @@ export default async function TemplatesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Link href={`/admin/templates/${t.id}/edit`} className="text-azul hover:underline">
+                      <Link href={`/admin/templates/${t.id}/edit`} prefetch={false} className="text-azul hover:underline">
                         Editar
                       </Link>
                       <ToggleActivaButton templateId={t.id} activa={t.is_active} />

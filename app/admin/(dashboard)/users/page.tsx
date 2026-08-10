@@ -21,6 +21,7 @@ export default async function UsersPage() {
         <h1 className="text-lg font-semibold text-slate-800">Usuarios del panel</h1>
         <Link
           href="/admin/users/new"
+          prefetch={false}
           className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro"
         >
           + Nuevo usuario
