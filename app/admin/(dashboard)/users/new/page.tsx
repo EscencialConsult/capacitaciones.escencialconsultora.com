@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
-import { registerAdmin } from './actions';
+import { createUser } from '../actions';
 
 function BotonCrear() {
   const { pending } = useFormStatus();
@@ -11,20 +11,19 @@ function BotonCrear() {
       disabled={pending}
       className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro disabled:opacity-60"
     >
-      {pending ? 'Creando...' : 'Crear cuenta'}
+      {pending ? 'Creando...' : 'Crear usuario'}
     </button>
   );
 }
 
-export default function RegisterAdminPage() {
-  const [state, formAction] = useFormState(registerAdmin, undefined);
+export default function NewUserPage() {
+  const [state, formAction] = useFormState(createUser, undefined);
 
   return (
     <div className="max-w-md">
-      <h1 className="text-lg font-semibold text-slate-800">Crear cuenta de administrador</h1>
+      <h1 className="text-lg font-semibold text-slate-800">Nuevo usuario del panel</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Solo vos podés ver esta página (ya estás logueado). Sirve para sumar otra persona al panel
-        más adelante — no es un registro público.
+        Va a poder loguearse en /admin/login con este email y contraseña, con el mismo acceso que vos.
       </p>
 
       <form action={formAction} className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-5">
@@ -55,7 +54,6 @@ export default function RegisterAdminPage() {
         </div>
 
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-green-700">Cuenta creada. Ya puede loguearse en /admin/login.</p>}
 
         <BotonCrear />
       </form>
