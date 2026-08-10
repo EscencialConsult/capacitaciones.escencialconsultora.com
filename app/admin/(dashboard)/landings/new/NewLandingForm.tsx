@@ -2,8 +2,9 @@
 
 import { useFormState, useFormStatus } from 'react-dom';
 import { createLanding } from '../actions';
+import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 
-type Plantilla = { id: string; name: string; variables_schema: unknown };
+type Plantilla = { id: string; name: string };
 type EmailPlantilla = { id: string; name: string };
 
 function BotonCrear() {
@@ -23,6 +24,88 @@ const campo =
   'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-azul focus:outline-none';
 const etiqueta = 'block text-sm font-medium text-slate-700';
 
+function BloqueEmail({
+  numero,
+  obligatorio,
+  emailTemplates,
+}: {
+  numero: 1 | 2 | 3 | 4;
+  obligatorio: boolean;
+  emailTemplates: EmailPlantilla[];
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <h2 className="text-sm font-semibold text-slate-800">
+        Email {numero} {obligatorio ? '(obligatorio)' : '(opcional)'}
+      </h2>
+      {!obligatorio && (
+        <p className="mt-1 text-xs text-slate-400">
+          Dejá asunto y contenido vacíos si no vas a usar este paso — se saltea solo, no hace falta
+          escribir nada de relleno.
+        </p>
+      )}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_140px]">
+        <div>
+          <label className={etiqueta} htmlFor={`step${numero}_email_template_id`}>
+            Diseño de email
+          </label>
+          <select
+            id={`step${numero}_email_template_id`}
+            name={`step${numero}_email_template_id`}
+            required={obligatorio}
+            defaultValue=""
+            className={campo}
+          >
+            <option value="">{obligatorio ? 'Elegí un diseño' : '— No usar este paso —'}</option>
+            {emailTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={etiqueta} htmlFor={`step${numero}_offset_days`}>
+            Días después del ingreso
+          </label>
+          <input
+            id={`step${numero}_offset_days`}
+            name={`step${numero}_offset_days`}
+            type="number"
+            min={0}
+            defaultValue={numero === 1 ? 0 : ''}
+            placeholder="0"
+            className={campo}
+          />
+        </div>
+      </div>
+      <div className="mt-4">
+        <label className={etiqueta} htmlFor={`step${numero}_subject`}>
+          Asunto
+        </label>
+        <input
+          id={`step${numero}_subject`}
+          name={`step${numero}_subject`}
+          required={obligatorio}
+          className={campo}
+        />
+      </div>
+      <div className="mt-4">
+        <label className={etiqueta} htmlFor={`step${numero}_content`}>
+          Contenido
+        </label>
+        <textarea
+          id={`step${numero}_content`}
+          name={`step${numero}_content`}
+          rows={3}
+          required={obligatorio}
+          className={campo}
+        />
+      </div>
+    </section>
+  );
+}
+
 export function NewLandingForm({
   templates,
   emailTemplates,
@@ -35,7 +118,10 @@ export function NewLandingForm({
   return (
     <form action={formAction} className="mt-6 space-y-6">
       <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-slate-800">Datos generales</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">Datos generales</h2>
+          <CopyLandingPromptButton />
+        </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -78,21 +164,25 @@ export function NewLandingForm({
           </div>
         </div>
 
-        <div className="mt-4">
-          <label className={etiqueta} htmlFor="variables_json">
-            Variables de la plantilla (JSON)
-          </label>
-          <textarea
-            id="variables_json"
-            name="variables_json"
-            rows={4}
-            defaultValue={'{\n  "titulo": "",\n  "subtitulo": "",\n  "boton_texto": "Enviar"\n}'}
-            className={`${campo} font-mono`}
-          />
-          <p className="mt-1 text-xs text-slate-400">
-            Las claves dependen de la plantilla elegida — fijate en la lista de arriba qué placeholders
-            usa cada una.
-          </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={etiqueta} htmlFor="var_titulo">
+              Título principal
+            </label>
+            <input id="var_titulo" name="var_titulo" className={campo} />
+          </div>
+          <div>
+            <label className={etiqueta} htmlFor="var_subtitulo">
+              Subtítulo
+            </label>
+            <input id="var_subtitulo" name="var_subtitulo" className={campo} />
+          </div>
+          <div>
+            <label className={etiqueta} htmlFor="var_boton_texto">
+              Texto del botón
+            </label>
+            <input id="var_boton_texto" name="var_boton_texto" defaultValue="Enviar" className={campo} />
+          </div>
         </div>
       </section>
 
@@ -125,38 +215,10 @@ export function NewLandingForm({
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-slate-800">Email 1 (obligatorio)</h2>
-        <p className="mt-1 text-xs text-slate-400">
-          Los pasos 2, 3, 4 se agregan después editando la landing.
-        </p>
-        <div className="mt-4 grid grid-cols-1 gap-4">
-          <div>
-            <label className={etiqueta} htmlFor="step1_email_template_id">
-              Diseño de email
-            </label>
-            <select id="step1_email_template_id" name="step1_email_template_id" required className={campo}>
-              {emailTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={etiqueta} htmlFor="step1_subject">
-              Asunto
-            </label>
-            <input id="step1_subject" name="step1_subject" required className={campo} />
-          </div>
-          <div>
-            <label className={etiqueta} htmlFor="step1_content">
-              Contenido
-            </label>
-            <textarea id="step1_content" name="step1_content" rows={3} required className={campo} />
-          </div>
-        </div>
-      </section>
+      <BloqueEmail numero={1} obligatorio emailTemplates={emailTemplates} />
+      <BloqueEmail numero={2} obligatorio={false} emailTemplates={emailTemplates} />
+      <BloqueEmail numero={3} obligatorio={false} emailTemplates={emailTemplates} />
+      <BloqueEmail numero={4} obligatorio={false} emailTemplates={emailTemplates} />
 
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 

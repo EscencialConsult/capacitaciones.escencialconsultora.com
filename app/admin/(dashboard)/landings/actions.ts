@@ -22,11 +22,33 @@ const createLandingSchema = z.object({
   status: z.enum(['draft', 'active']),
   advisor_name: z.string().trim().optional().default(''),
   whatsapp_number: z.string().trim().optional().default(''),
+  // Mensaje PRELLENADO que manda EL LEAD al asesor por WhatsApp al
+  // clickear el botón del email — el sistema nunca lo manda solo, ver
+  // Script C del sistema viejo / app/api/track/route.ts acá.
   whatsapp_message: z.string().trim().optional().default(''),
-  variables_json: z.string().trim().min(1),
+  var_titulo: z.string().trim().optional().default(''),
+  var_subtitulo: z.string().trim().optional().default(''),
+  var_boton_texto: z.string().trim().optional().default('Enviar'),
+  // Paso 1 es obligatorio (toda landing manda al menos un email). Los
+  // pasos 2 a 4 son opcionales — se saltean solos si asunto Y contenido
+  // quedan vacíos, mismo criterio que template_base_N vacío en el
+  // sistema viejo (nunca rellenar con texto tipo "N/A").
   step1_email_template_id: z.string().uuid('Elegí una plantilla de email.'),
+  step1_offset_days: z.coerce.number().int().min(0).default(0),
   step1_subject: z.string().trim().min(1, 'Falta el asunto del email 1.'),
   step1_content: z.string().trim().min(1, 'Falta el contenido del email 1.'),
+  step2_email_template_id: z.string().optional().default(''),
+  step2_offset_days: z.coerce.number().int().min(0).default(0),
+  step2_subject: z.string().trim().optional().default(''),
+  step2_content: z.string().trim().optional().default(''),
+  step3_email_template_id: z.string().optional().default(''),
+  step3_offset_days: z.coerce.number().int().min(0).default(0),
+  step3_subject: z.string().trim().optional().default(''),
+  step3_content: z.string().trim().optional().default(''),
+  step4_email_template_id: z.string().optional().default(''),
+  step4_offset_days: z.coerce.number().int().min(0).default(0),
+  step4_subject: z.string().trim().optional().default(''),
+  step4_content: z.string().trim().optional().default(''),
 });
 
 export async function createLanding(_prevState: { error?: string } | undefined, formData: FormData) {
@@ -36,12 +58,20 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
   }
+  const d = parsed.data;
 
-  let variables: Record<string, unknown>;
-  try {
-    variables = JSON.parse(parsed.data.variables_json);
-  } catch {
-    return { error: 'El JSON de variables no es válido.' };
+  // Se valida y arma ANTES de tocar la base — si falta el diseño de un
+  // paso, no queremos una landing a medio crear sin sus emails.
+  const pasos = [
+    { n: 1, email_template_id: d.step1_email_template_id, offset_days: d.step1_offset_days, subject: d.step1_subject, content: d.step1_content },
+    { n: 2, email_template_id: d.step2_email_template_id, offset_days: d.step2_offset_days, subject: d.step2_subject, content: d.step2_content },
+    { n: 3, email_template_id: d.step3_email_template_id, offset_days: d.step3_offset_days, subject: d.step3_subject, content: d.step3_content },
+    { n: 4, email_template_id: d.step4_email_template_id, offset_days: d.step4_offset_days, subject: d.step4_subject, content: d.step4_content },
+  ].filter((p) => p.n === 1 || (p.subject.trim() !== '' && p.content.trim() !== ''));
+
+  const pasoSinDiseno = pasos.find((p) => !p.email_template_id);
+  if (pasoSinDiseno) {
+    return { error: `Falta elegir el diseño de email para el paso ${pasoSinDiseno.n}.` };
   }
 
   const supabase = createSupabaseServiceClient();
@@ -49,14 +79,14 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
   const { data: landing, error: landingError } = await supabase
     .from('landings')
     .insert({
-      slug: parsed.data.slug,
-      name: parsed.data.name,
-      template_id: parsed.data.template_id,
-      status: parsed.data.status,
-      advisor_name: parsed.data.advisor_name || null,
-      whatsapp_number: parsed.data.whatsapp_number || null,
-      whatsapp_message: parsed.data.whatsapp_message || null,
-      variables,
+      slug: d.slug,
+      name: d.name,
+      template_id: d.template_id,
+      status: d.status,
+      advisor_name: d.advisor_name || null,
+      whatsapp_number: d.whatsapp_number || null,
+      whatsapp_message: d.whatsapp_message || null,
+      variables: { titulo: d.var_titulo, subtitulo: d.var_subtitulo, boton_texto: d.var_boton_texto },
     })
     .select('id')
     .single();
@@ -69,18 +99,20 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
     return { error: 'No se pudo crear la landing.' };
   }
 
-  const { error: stepError } = await supabase.from('landing_email_steps').insert({
-    landing_id: landing.id,
-    step_number: 1,
-    email_template_id: parsed.data.step1_email_template_id,
-    offset_days: 0,
-    subject: parsed.data.step1_subject,
-    content: parsed.data.step1_content,
-  });
+  const { error: stepError } = await supabase.from('landing_email_steps').insert(
+    pasos.map((p) => ({
+      landing_id: landing.id,
+      step_number: p.n,
+      email_template_id: p.email_template_id,
+      offset_days: p.offset_days,
+      subject: p.subject,
+      content: p.content,
+    }))
+  );
 
   if (stepError) {
     console.error('Error creando landing_email_steps:', stepError);
-    return { error: 'La landing se creó, pero falló el paso de email 1. Editala para reintentar.' };
+    return { error: 'La landing se creó, pero falló algún paso de email. Revisala en la lista.' };
   }
 
   revalidatePath('/admin/landings');
