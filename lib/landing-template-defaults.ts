@@ -12,12 +12,12 @@ export const VARIABLES_SCHEMA_FIJO = [
 ];
 
 /**
- * HTML base que ya está en producción (migrado del sistema viejo,
- * ver supabase/migrations/0002_seed.sql). Sirve como punto de partida
- * al crear una plantilla nueva, y es el mismo HTML que se le pasa a
- * una IA en el prompt de abajo — así nunca hay que reinventar la
- * lógica del formulario (POST a /api/leads, el {{__landing_id__}}
- * oculto), solo el diseño visual.
+ * SOLO la parte funcional (los campos que se envían y el JS que los
+ * manda a /api/leads) — sin ningún diseño visual (nada de colores,
+ * layout, sombras). El diseño es 100% libre cada vez; lo único que se
+ * mantiene siempre igual es cómo se capturan y envían los datos, que
+ * es lo que ya traía el sistema desde el principio y no debería
+ * reinventarse en cada plantilla.
  */
 export const HTML_BASE = `<!DOCTYPE html>
 <html lang="es">
@@ -25,81 +25,31 @@ export const HTML_BASE = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{titulo}}</title>
-<style>
-  :root {
-    --azul: #1a4fd6;
-    --azul-oscuro: #0f2f7a;
-    --gris-texto: #2b2b33;
-    --fondo: #f6f7fb;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    background: var(--fondo);
-    color: var(--gris-texto);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 24px;
-  }
-  .card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(15, 47, 122, 0.12);
-    padding: 40px;
-    max-width: 440px;
-    width: 100%;
-  }
-  h1 { font-size: 1.5rem; margin-bottom: 8px; }
-  p.subtitulo { color: #666; margin-bottom: 28px; font-size: 0.95rem; }
-  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 16px 0 6px; }
-  input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1px solid #dcdfe6;
-    border-radius: 10px;
-    font-size: 1rem;
-  }
-  input:focus { outline: none; border-color: var(--azul); }
-  button {
-    width: 100%;
-    margin-top: 24px;
-    padding: 14px;
-    border: none;
-    border-radius: 10px;
-    background: var(--azul);
-    color: #fff;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:hover { background: var(--azul-oscuro); }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  #mensaje { margin-top: 18px; font-size: 0.9rem; text-align: center; display: none; }
-  #mensaje.ok { color: #1a7a3a; display: block; }
-  #mensaje.error { color: #b3261e; display: block; }
-</style>
 </head>
 <body>
-<div class="card">
-  <h1>{{titulo}}</h1>
-  <p class="subtitulo">{{subtitulo}}</p>
-  <form id="form-lead">
-    <input type="hidden" name="landing_id" value="{{__landing_id__}}">
-    <label for="nombre">Nombre</label>
-    <input type="text" id="nombre" name="nombre" required>
-    <label for="apellido">Apellido</label>
-    <input type="text" id="apellido" name="apellido" required>
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" required>
-    <label for="telefono">Teléfono (opcional)</label>
-    <input type="tel" id="telefono" name="phone">
-    <button type="submit" id="btn-enviar">{{boton_texto}}</button>
-    <div id="mensaje"></div>
-  </form>
-</div>
+
+<h1>{{titulo}}</h1>
+<p>{{subtitulo}}</p>
+
+<form id="form-lead">
+  <input type="hidden" name="landing_id" value="{{__landing_id__}}">
+
+  <label for="nombre">Nombre</label>
+  <input type="text" id="nombre" name="nombre" required>
+
+  <label for="apellido">Apellido</label>
+  <input type="text" id="apellido" name="apellido" required>
+
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email" required>
+
+  <label for="telefono">Teléfono (opcional)</label>
+  <input type="tel" id="telefono" name="phone">
+
+  <button type="submit" id="btn-enviar">{{boton_texto}}</button>
+  <div id="mensaje"></div>
+</form>
+
 <script>
   const form = document.getElementById('form-lead');
   const boton = document.getElementById('btn-enviar');
@@ -126,14 +76,16 @@ export const HTML_BASE = `<!DOCTYPE html>
         mensaje.textContent = data.duplicado
           ? 'Ya estabas registrado. ¡Gracias!'
           : '¡Listo! En breve nos contactamos.';
-        mensaje.className = 'ok';
+        mensaje.style.color = 'green';
+        mensaje.style.display = 'block';
         form.reset();
       } else {
         throw new Error(data.error || 'Error desconocido');
       }
     } catch (err) {
       mensaje.textContent = 'Hubo un problema al enviar. Probá de nuevo en un momento.';
-      mensaje.className = 'error';
+      mensaje.style.color = 'red';
+      mensaje.style.display = 'block';
       console.error(err);
     } finally {
       boton.disabled = false;
@@ -141,6 +93,7 @@ export const HTML_BASE = `<!DOCTYPE html>
     }
   });
 </script>
+
 </body>
 </html>`;
 
@@ -148,22 +101,23 @@ export const HTML_BASE = `<!DOCTYPE html>
  * Prompt autosuficiente para pedirle a cualquier IA un diseño nuevo de
  * plantilla, sin que tenga que adivinar la lógica del formulario —
  * mismo criterio que el prompt del sistema viejo (docs/generar-campana-nueva.md):
- * el HTML real va adentro, no descrito.
+ * el HTML real va adentro, no descrito. Deja explícito que el diseño
+ * visual es 100% libre — lo único fijo es cómo se envían los datos.
  */
 export function armarPromptPlantillaNueva() {
   return `Necesito un diseño nuevo de landing para mi plataforma. Antes de generar nada, preguntame UNA COSA a la vez y esperá mi respuesta:
 
 1. ¿Qué estilo/tema visual querés? (colores, referencia de marca, humor de la campaña, etc.)
 
-Con esa respuesta, generame un HTML nuevo partiendo EXACTAMENTE del que pego abajo — es el código real ya en producción. NO toques el JavaScript del formulario, ni el fetch a /api/leads, ni el input oculto "landing_id", ni los nombres de los campos (nombre, apellido, email, phone). Lo ÚNICO que cambia es el diseño visual: el <style> y la estructura del <div class="card"> (o equivalente).
+El HTML de abajo tiene SOLO la parte funcional (los campos del formulario y el script que manda los datos) — no tiene ningún diseño, ni colores, ni layout. Tu trabajo es vestirlo por completo: agregar el <style>, reorganizar el <body> como quieras (tarjeta centrada, fullscreen, lo que sea), tipografías, colores, animaciones. Tenés libertad total en lo visual.
 
-Las 3 variables son SIEMPRE las mismas, no inventes otras: {{titulo}}, {{subtitulo}}, {{boton_texto}}. Dejalas en el HTML tal cual, como placeholders — no les pongas texto fijo, esos valores se completan después al crear cada landing.
+Lo único que NO podés tocar es la parte funcional: los inputs del formulario con sus atributos "name" exactos (nombre, apellido, email, phone, y el input oculto "landing_id"), el bloque <script> completo tal cual (hace el fetch a /api/leads con esos datos), y los 3 placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} — tienen que seguir estando en el HTML final, en algún lugar del diseño que armes, sin texto fijo reemplazándolos.
 
-HTML base (no tocar la lógica, solo el diseño):
+HTML base (función fija, diseño libre):
 
 \`\`\`html
 ${HTML_BASE}
 \`\`\`
 
-Cuando termines, dame el HTML completo listo para pegar en el campo "HTML de la plantilla" del panel — nada más, sin explicaciones extra en el medio del código.`;
+Cuando termines, dame el HTML completo (con tu diseño ya integrado) listo para pegar en el campo "HTML de la plantilla" del panel — nada más, sin explicaciones extra en el medio del código.`;
 }
