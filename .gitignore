@@ -2,3 +2,23 @@
 CONFIGURACION-LOCAL.md
 .env
 .env.*
+!.env.local.example
+
+# Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# Netlify
+.netlify/
+
+# Supabase CLI (si se usa localmente)
+supabase/.temp/
+
+# Tipos generados (se regeneran con `npm run gen:types`)
+lib/supabase/database.types.ts
+
+# Sistema operativo / editor
+.DS_Store
+*.log

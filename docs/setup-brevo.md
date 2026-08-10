@@ -1,3 +1,7 @@
+> **⚠️ Sistema descartado (2026-08-10).** Este doc describe el sistema viejo (Google Sheets + Apps Script), reemplazado por una plataforma en Next.js + Supabase. Se conserva como referencia histórica — ver el `README.md` de la raíz del repo para el sistema actual.
+
+---
+
 # Armar la cuenta de Brevo
 
 Una sola cuenta para todo el proyecto/dominio — no una por landing (ver

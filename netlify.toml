@@ -1,0 +1,14 @@
+[build]
+  command = "next build"
+  publish = ".next"
+
+[functions]
+  directory = "netlify/functions"
+
+# El Next Runtime de Netlify detecta este proyecto automáticamente y arma
+# el resto de la config (SSR, Route Handlers, Middleware) sin plugin extra.
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
