@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { signOut } from './login/actions';
+import { signOut } from '../login/actions';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
