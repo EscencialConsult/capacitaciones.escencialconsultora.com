@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@netlify/functions": "^2.8.2",
+    "@netlify/plugin-nextjs": "^5.15.13",
     "@types/node": "^20.16.10",
     "@types/pg": "^8.21.0",
     "@types/react": "^18.3.11",

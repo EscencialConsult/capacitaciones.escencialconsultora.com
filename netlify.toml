@@ -4,11 +4,17 @@
 [functions]
   directory = "netlify/functions"
 
-# Sin "publish" a propósito: el Next Runtime de Netlify (detectado solo
-# por el framework) maneja el ruteo de SSR/Route Handlers/Middleware por
-# su cuenta. Forzar publish = ".next" hace que Netlify sirva esa carpeta
-# como si fuera contenido estático plano en vez de dejar que el Next
-# Runtime la interprete — eso rompía TODAS las rutas (404 hasta en "/").
+# Sin "publish" a propósito: el Next Runtime de Netlify maneja el
+# ruteo de SSR/Route Handlers/Middleware por su cuenta. Forzar
+# publish = ".next" hace que Netlify sirva esa carpeta como si fuera
+# contenido estático plano — eso rompía TODAS las rutas (404 hasta en "/").
+
+# La auto-detección del framework NO estaba generando la función de SSR
+# (el deploy quedaba "ready" pero sin ninguna función de Next publicada,
+# por eso 404 hasta en la URL directa del deploy). Declarar el plugin acá
+# a mano fuerza a Netlify a instalarlo y correrlo en el build.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [[headers]]
   for = "/admin/*"
