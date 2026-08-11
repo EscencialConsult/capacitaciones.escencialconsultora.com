@@ -1,13 +1,17 @@
 [build]
   command = "next build"
+  publish = ".next"
 
 [functions]
   directory = "netlify/functions"
 
-# Sin "publish" a propósito: el Next Runtime de Netlify maneja el
-# ruteo de SSR/Route Handlers/Middleware por su cuenta. Forzar
-# publish = ".next" hace que Netlify sirva esa carpeta como si fuera
-# contenido estático plano — eso rompía TODAS las rutas (404 hasta en "/").
+# publish = ".next" SOLO funciona bien cuando el plugin de abajo está
+# declarado: el plugin intercepta esa carpeta y arma las funciones de
+# SSR/Route Handlers/Middleware a partir de ella. Sin el plugin, Netlify
+# serviría ".next" como archivos estáticos planos y rompía todas las
+# rutas (eso pasó antes). Sin ESTA línea, Netlify usaba el publish
+# directory guardado en el dashboard (la raíz del repo) y el plugin
+# fallaba con "publish directory cannot be the same as the base directory".
 
 # La auto-detección del framework NO estaba generando la función de SSR
 # (el deploy quedaba "ready" pero sin ninguna función de Next publicada,
