@@ -10,9 +10,16 @@ import { replacePlaceholders } from '@/lib/templates';
  *
  * Rutas reservadas que NUNCA pueden ser un slug de landing: 'admin',
  * 'api' — Next.js ya las prioriza por estructura de carpetas, pero la
- * validación en app/admin/landings/new impide crear una landing con
- * esos slugs para que no haya ambigüedad al leer el código.
+ * validación en app/admin/campaigns/actions.ts impide crear una campaña
+ * con esos slugs para que no haya ambigüedad al leer el código.
+ *
+ * force-dynamic es obligatorio acá: sin esto, un GET handler se trata
+ * como estático y Next.js cachea la respuesta (incluido un 404) para
+ * siempre, sin volver a consultar la base — una landing recién activada
+ * quedaría devolviendo el 404 viejo de cuando todavía era un borrador.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(_request: Request, { params }: { params: { slug: string } }) {
   const supabase = createSupabaseServiceClient();
 

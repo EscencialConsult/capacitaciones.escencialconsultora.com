@@ -8,7 +8,16 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server';
  * después se redirige a la conversación real de WhatsApp. El sistema
  * nunca manda el WhatsApp — arma el link con el texto prellenado y es
  * el lead quien decide mandarlo desde su propio teléfono.
+ *
+ * force-dynamic obligatorio: lee el querystring a mano desde
+ * `request.url` en vez de `NextRequest.nextUrl`, que es la única forma
+ * que Next.js reconoce sola para marcar la ruta como dinámica. Sin esto,
+ * Next.js podría cachear la respuesta de UN lead (redirect a wa.me con
+ * SU número) y servírsela cacheada a cualquier otro lead que clickee el
+ * mismo paso — un bug de datos cruzados, no solo de caché vieja.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get('lead_id');

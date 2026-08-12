@@ -9,7 +9,7 @@ export function EnviarPendientesButton() {
 
   return (
     <div className="flex items-center gap-3">
-      {resultado && <span className="text-xs text-slate-500">{resultado}</span>}
+      {resultado && <span className="text-xs text-one-oscuro/50">{resultado}</span>}
       <button
         type="button"
         disabled={pending}
@@ -20,7 +20,7 @@ export function EnviarPendientesButton() {
             setResultado(`${r.enviados} enviados, ${r.errores} con error (${r.procesados} revisados)`);
           });
         }}
-        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        className="rounded-full border border-one-oscuro/15 px-6 py-2.5 text-sm font-bold text-one-oscuro transition-all duration-300 hover:-translate-y-0.5 hover:bg-one-oscuro/5 disabled:pointer-events-none disabled:opacity-60"
       >
         {pending ? 'Enviando...' : 'Enviar pendientes ahora'}
       </button>
