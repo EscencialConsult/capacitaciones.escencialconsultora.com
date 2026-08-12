@@ -6,7 +6,11 @@ import { armarPromptCampanaNueva } from '@/lib/landing-template-defaults';
 // El prompt cambia según qué plantilla esté elegida en el form (las
 // variables a completar son distintas por plantilla) — por eso recibe
 // `variables` como prop en vez de armar el texto por su cuenta.
-export function CopyLandingPromptButton({ variables }: { variables: { key: string; label: string }[] }) {
+export function CopyLandingPromptButton({
+  variables,
+}: {
+  variables: { key: string; label: string; description?: string }[];
+}) {
   const [copiado, setCopiado] = useState(false);
 
   return (

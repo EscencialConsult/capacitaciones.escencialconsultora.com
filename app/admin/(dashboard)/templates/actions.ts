@@ -4,21 +4,30 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-import { extraerVariablesDeHtml } from '@/lib/landing-template-defaults';
+import {
+  extraerVariablesDeHtml,
+  combinarVariables,
+  type DescripcionVariable,
+} from '@/lib/landing-template-defaults';
 
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
   category_id: z.string().uuid().optional().or(z.literal('')),
   html_content: z.string().min(1, 'Falta el HTML de la plantilla.'),
   is_active: z.enum(['true', 'false']),
+  // Bloque B del prompt de plantilla (opcional) — label + descripción
+  // de cada variable, para que el prompt de campaña sepa qué va en
+  // cada campo y no solo el nombre de la clave. Ver armarPromptPlantillaNueva.
+  variables_meta: z.string().trim().optional().default(''),
 });
 
 /**
- * Las variables NO se tipean a mano en ningún campo — se detectan solas
+ * Las variables NO se tipean a mano campo por campo — se detectan solas
  * a partir de cada {{clave}} que aparezca en el HTML pegado (ver
- * extraerVariablesDeHtml). Así una plantilla nueva con {{precio_plan_1}}
- * o cualquier variable propia queda disponible en el formulario de
- * campaña sin tocar código ni mostrar una interfaz de JSON en el panel.
+ * extraerVariablesDeHtml). El JSON opcional de variables_meta solo
+ * mejora el label y agrega la descripción de cada una ya detectada,
+ * nunca agrega ni saca variables por su cuenta — la única fuente de
+ * verdad de QUÉ variables existen es el HTML.
  */
 function parseTemplateForm(formData: FormData) {
   const raw = Object.fromEntries(formData) as Record<string, string>;
@@ -27,12 +36,28 @@ function parseTemplateForm(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' } as const;
   }
 
+  let descripciones: Record<string, DescripcionVariable> | undefined;
+  if (parsed.data.variables_meta) {
+    try {
+      const json = JSON.parse(parsed.data.variables_meta);
+      if (typeof json !== 'object' || json === null || Array.isArray(json)) throw new Error();
+      descripciones = json;
+    } catch {
+      return {
+        error:
+          'El JSON de "Descripciones de variables" no es válido — tiene que ser un objeto {"clave": {"label": "...", "descripcion": "..."}}.',
+      } as const;
+    }
+  }
+
+  const detectadas = extraerVariablesDeHtml(parsed.data.html_content);
+
   return {
     data: {
       name: parsed.data.name,
       category_id: parsed.data.category_id || null,
       html_content: parsed.data.html_content,
-      variables_schema: extraerVariablesDeHtml(parsed.data.html_content),
+      variables_schema: combinarVariables(detectadas, descripciones),
       is_active: parsed.data.is_active === 'true',
     },
   } as const;

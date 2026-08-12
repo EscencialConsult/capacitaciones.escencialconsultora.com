@@ -1,4 +1,16 @@
-export type VariableSchema = { key: string; label: string; type: 'text' | 'textarea' };
+export type VariableSchema = {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea';
+  // Qué va en ese campo, en qué formato/tono — la IA que arma el HTML
+  // la escribe (ver armarPromptPlantillaNueva, bloque B), no se infiere
+  // del nombre de la clave. Sin esto, el prompt de campaña solo puede
+  // mostrar "plan_1_precio" y una etiqueta linda, pero no explica qué
+  // formato/contenido corresponde ahí — description cierra ese hueco.
+  description?: string;
+};
+
+export type DescripcionVariable = { label?: string; descripcion?: string };
 
 // Labels prolijas para las variables de siempre — cualquier otra clave
 // nueva que aparezca en el HTML se etiqueta automáticamente a partir de
@@ -43,6 +55,29 @@ export function extraerVariablesDeHtml(html: string): VariableSchema[] {
     label: ETIQUETAS_CONOCIDAS[key] ?? etiquetaDesdeClave(key),
     type: PISTAS_TEXTO_LARGO.some((pista) => key.includes(pista)) ? 'textarea' : 'text',
   }));
+}
+
+/**
+ * Fusiona lo detectado automáticamente del HTML con las descripciones
+ * que pegó el usuario (bloque B del prompt de plantilla — ver más
+ * abajo). Si una clave no tiene descripción pegada, se queda con el
+ * label auto-generado y sin description — no es obligatorio pegar el
+ * bloque B, es una mejora, no un requisito para guardar la plantilla.
+ */
+export function combinarVariables(
+  detectadas: VariableSchema[],
+  descripciones?: Record<string, DescripcionVariable> | null
+): VariableSchema[] {
+  if (!descripciones) return detectadas;
+  return detectadas.map((v) => {
+    const meta = descripciones[v.key];
+    if (!meta) return v;
+    return {
+      ...v,
+      label: meta.label?.trim() || v.label,
+      description: meta.descripcion?.trim() || undefined,
+    };
+  });
 }
 
 /**
@@ -191,7 +226,16 @@ Con esas respuestas, generame el HTML completo de la plantilla. Partí EXACTAMEN
    - Los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} y el reservado {{__landing_id__}} ya vienen en el HTML base — podés mantenerlos, moverlos, o sacarlos y usar tus propias claves si el diseño no los necesita tal cual. Lo único que no se toca es la lógica del <form> y el <script>.
    - Agregá un footer al final con los datos reales de contacto de acá abajo — SIEMPRE estos datos exactos, tal cual están escritos (dirección, teléfonos, email, redes), nunca inventes otros ni los cambies. Diseñalo acorde al resto (colores, tipografía), pero el texto y los links no se tocan. No hace falta poner las 3 sucursales una al lado de la otra si no entran bien visualmente — un acordeón, tabs, o simplemente apiladas en columnas también sirve, es una decisión de layout, no de contenido.
 
-Dame directo el HTML completo, sin explicaciones antes ni después.
+Dame DOS bloques, nada de explicaciones antes ni después:
+
+A) El HTML completo, como se explicó arriba.
+
+B) Un JSON válido (sin comentarios, sin texto alrededor) con una entrada por cada {{clave}} que hayas usado (excepto los reservados titulo/subtitulo/boton_texto/__landing_id__ si los dejaste tal cual, esos ya los conozco) — para cada una, un label corto en español y una descripción de una línea de QUÉ va ahí y en qué formato/tono, para que después, al crear una campaña con esta plantilla, se sepa exactamente qué escribir en cada campo sin tener que adivinar por el nombre de la clave:
+
+{
+  "precio_plan_1": { "label": "Precio del plan 1", "descripcion": "Precio con formato $X.XXX, sin decimales, ej: $49.999" },
+  "faq_1_pregunta": { "label": "Pregunta 1 del FAQ", "descripcion": "Una pregunta frecuente real sobre el curso, corta, en tono cercano" }
+}
 
 HTML base (función fija, diseño libre):
 
@@ -205,7 +249,7 @@ Datos reales para el footer (usar tal cual, nunca inventar otros):
 ${INFO_FOOTER_ESCENCIAL}
 \`\`\`
 
-Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): este HTML lo subo como plantilla nueva en el panel — el nombre interno de la plantilla y la categoría los cargo yo directo ahí, no hace falta que me los preguntes.`;
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel — el nombre interno de la plantilla y la categoría los cargo yo directo ahí, no hace falta que me los preguntes. El JSON (B) lo pego en el campo "Descripciones de variables" de esa misma pantalla — así el prompt que voy a copiar después, cuando cree una campaña con esta plantilla, ya sabe qué significa cada variable.`;
 }
 
 /**
@@ -216,9 +260,11 @@ Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto)
  * /admin/campaigns/new que toma este bloque tal cual y completa todos
  * los campos de variables solo (ver CampaignForm.tsx → aplicarJson).
  */
-export function armarPromptCampanaNueva(variables: { key: string; label: string }[]) {
+export function armarPromptCampanaNueva(variables: { key: string; label: string; description?: string }[]) {
   const listaVariables = variables.length
-    ? variables.map((v) => `   - ${v.key} → ${v.label}`).join('\n')
+    ? variables
+        .map((v) => `   - ${v.key} → ${v.label}${v.description ? ` — ${v.description}` : ''}`)
+        .join('\n')
     : '   (esta plantilla no tiene ningún campo de texto propio — no hace falta preguntar nada acá)';
 
   const jsonEjemplo = variables.length

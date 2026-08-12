@@ -5,7 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
-type VariableSchema = { key: string; label: string; type: 'text' | 'textarea' };
+type VariableSchema = { key: string; label: string; type: 'text' | 'textarea'; description?: string };
 type Plantilla = { id: string; name: string; variables_schema: VariableSchema[] | null };
 type EmailPlantilla = { id: string; name: string };
 type Accion = (

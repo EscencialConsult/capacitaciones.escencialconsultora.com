@@ -4,8 +4,26 @@ import { useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { NewCategoryModal } from './NewCategoryModal';
 import { CopyPromptButton } from './CopyPromptButton';
-import { HTML_BASE, extraerVariablesDeHtml } from '@/lib/landing-template-defaults';
+import {
+  HTML_BASE,
+  extraerVariablesDeHtml,
+  combinarVariables,
+  type VariableSchema,
+} from '@/lib/landing-template-defaults';
 import { FormInput, inputClass, labelClass } from '../FormInput';
+
+// Si la plantilla ya tenía descripciones guardadas (de una vuelta
+// anterior), se reconstruye el mismo JSON para prellenar el campo de
+// edición — así no se pierden al editar, y se pueden retocar a mano.
+function serializarDescripciones(schema: VariableSchema[]): string {
+  const conDescripcion = schema.filter((v) => v.description);
+  if (conDescripcion.length === 0) return '';
+  const obj: Record<string, { label: string; descripcion: string }> = {};
+  for (const v of conDescripcion) {
+    obj[v.key] = { label: v.label, descripcion: v.description! };
+  }
+  return JSON.stringify(obj, null, 2);
+}
 
 type Categoria = { id: string; name: string };
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
@@ -36,13 +54,26 @@ export function TemplateForm({
     name: string;
     category_id: string | null;
     html_content: string;
-    variables_schema: unknown;
+    variables_schema: VariableSchema[] | null;
     is_active: boolean;
   };
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const [html, setHtml] = useState(valoresIniciales?.html_content ?? HTML_BASE);
-  const variablesDetectadas = useMemo(() => extraerVariablesDeHtml(html), [html]);
+  const [variablesMeta, setVariablesMeta] = useState(
+    () => serializarDescripciones(valoresIniciales?.variables_schema ?? [])
+  );
+  const variablesDetectadas = useMemo(() => {
+    const detectadas = extraerVariablesDeHtml(html);
+    try {
+      const descripciones = variablesMeta.trim() ? JSON.parse(variablesMeta) : undefined;
+      return combinarVariables(detectadas, descripciones);
+    } catch {
+      // JSON a medio escribir mientras se tipea — se sigue mostrando lo
+      // detectado sin descripción hasta que el JSON vuelva a ser válido.
+      return detectadas;
+    }
+  }, [html, variablesMeta]);
   const [listaCategorias, setListaCategorias] = useState(categorias);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -153,13 +184,38 @@ export function TemplateForm({
               {variablesDetectadas.map((v) => (
                 <span
                   key={v.key}
-                  title={v.label}
-                  className="rounded-full bg-one-fucsia/10 px-2.5 py-0.5 text-xs font-medium text-one-fucsia"
+                  title={v.description ? `${v.label} — ${v.description}` : v.label}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    v.description
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-one-fucsia/10 text-one-fucsia'
+                  }`}
                 >
                   {'{{' + v.key + '}}'}
                 </span>
               ))}
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label className={labelClass} htmlFor="variables_meta">
+              Descripciones de variables (JSON, opcional)
+            </label>
+            <textarea
+              id="variables_meta"
+              name="variables_meta"
+              rows={4}
+              value={variablesMeta}
+              onChange={(e) => setVariablesMeta(e.target.value)}
+              placeholder={'{\n  "precio_plan_1": { "label": "Precio del plan 1", "descripcion": "Con formato $X.XXX" }\n}'}
+              className={`${inputClass} font-mono text-xs`}
+            />
+            <p className="mt-1 text-xs text-one-oscuro/40">
+              Pegá acá el bloque B que te devuelve el prompt de arriba — para cada variable, qué
+              contenido/formato va ahí. Es opcional: sin esto la variable igual funciona, solo que el
+              prompt de campaña va a mostrar el nombre de la clave nomás, sin explicación. Los chips en
+              verde de arriba ya tienen descripción cargada.
+            </p>
           </div>
         </div>
 
