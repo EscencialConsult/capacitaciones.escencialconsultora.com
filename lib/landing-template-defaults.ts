@@ -132,6 +132,23 @@ export const HTML_BASE = `<!DOCTYPE html>
 </html>`;
 
 /**
+ * Datos reales de contacto de Escencial Consultora, sacados del sitio
+ * en vivo (escencialconsultora.com.ar) el 2026-08-12 — nunca inventar
+ * otra dirección/teléfono/red social acá ni dejar que la IA los invente
+ * en el prompt. Instagram no está entre sus redes publicadas; si en
+ * algún momento se suma, agregarlo acá (única fuente de verdad).
+ */
+export const INFO_FOOTER_ESCENCIAL = `Escencial Consultora
+Tucumán: Catamarca 873, San Miguel de Tucumán · +54 9 3816 22-1565
+Buenos Aires: Paraguay 635, C1008AAT, CABA · +54 9 11 3358-8062
+Bolivia: Manzana 40, torre 2, piso 10, Santa Cruz de la Sierra · +591 62843954
+Email: info@escencialconsult.com.ar
+Facebook: https://www.facebook.com/escencialconsultora/
+Twitter/X: https://twitter.com/EscencialConsu
+LinkedIn: https://www.linkedin.com/company/escencialconsultora/
+© 2026 Escencial Consultora — Todos los derechos reservados.`;
+
+/**
  * DOS prompts separados (2026-08-12) — antes había uno solo que mezclaba
  * diseño con datos de campaña, y eso ya no tiene sentido con Plantillas
  * y Campañas separadas (ver campaigns/ vs templates/): la plantilla es
@@ -172,6 +189,7 @@ Con esas respuestas, generame el HTML completo de la plantilla. Partí EXACTAMEN
    - Íconos: SVG inline si hacen falta, nunca una librería de íconos externa.
    - Cada campo de contenido que vaya a variar por campaña (título, precio, lo que sea) va como {{clave}} — elegí vos el nombre de cada clave, en minúsculas y sin espacios (ej: {{precio_plan_1}}). No hace falta declararlas en ningún lado aparte: el sistema las detecta solas apenas pegue este HTML en el panel.
    - Los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} y el reservado {{__landing_id__}} ya vienen en el HTML base — podés mantenerlos, moverlos, o sacarlos y usar tus propias claves si el diseño no los necesita tal cual. Lo único que no se toca es la lógica del <form> y el <script>.
+   - Agregá un footer al final con los datos reales de contacto de acá abajo — SIEMPRE estos datos exactos, tal cual están escritos (dirección, teléfonos, email, redes), nunca inventes otros ni los cambies. Diseñalo acorde al resto (colores, tipografía), pero el texto y los links no se tocan. No hace falta poner las 3 sucursales una al lado de la otra si no entran bien visualmente — un acordeón, tabs, o simplemente apiladas en columnas también sirve, es una decisión de layout, no de contenido.
 
 Dame directo el HTML completo, sin explicaciones antes ni después.
 
@@ -179,6 +197,12 @@ HTML base (función fija, diseño libre):
 
 \`\`\`html
 ${HTML_BASE}
+\`\`\`
+
+Datos reales para el footer (usar tal cual, nunca inventar otros):
+
+\`\`\`
+${INFO_FOOTER_ESCENCIAL}
 \`\`\`
 
 Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): este HTML lo subo como plantilla nueva en el panel — el nombre interno de la plantilla y la categoría los cargo yo directo ahí, no hace falta que me los preguntes.`;
