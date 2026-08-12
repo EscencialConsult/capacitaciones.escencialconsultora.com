@@ -86,15 +86,19 @@ export default async function CampaignsPage() {
                   <td className="px-4 py-3 text-one-oscuro/60">{cantidadEmails}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {c.status === 'draft' && (
-                        <Link
-                          href={`/admin/campaigns/${c.id}/edit`}
-                          prefetch={false}
-                          className="text-one-fucsia hover:underline"
-                        >
-                          Editar
-                        </Link>
-                      )}
+                      {/* Siempre visible — si la campaña ya no está en
+                          borrador, el propio /edit redirige solo a Ver
+                          leads (ver el guard en [id]/edit/page.tsx):
+                          el contenido de una campaña activa no se toca
+                          desde acá, ya tiene emails agendados contra
+                          sus pasos actuales. */}
+                      <Link
+                        href={`/admin/campaigns/${c.id}/edit`}
+                        prefetch={false}
+                        className="text-one-fucsia hover:underline"
+                      >
+                        Editar
+                      </Link>
                       <Link
                         href={`/admin/campaigns/${c.id}/leads`}
                         prefetch={false}
