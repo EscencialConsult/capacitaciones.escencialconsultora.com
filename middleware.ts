@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  let response = NextResponse.next({ request });
+  let cookiesParaRefrescar: CookieToSet[] = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,10 +27,7 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesParaRefrescar = cookiesToSet;
         },
       },
     }
@@ -44,6 +41,20 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/admin/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
+
+  // El layout del dashboard necesita el email para el pill de usuario del
+  // header. Se lo pasamos por header del REQUEST (no de la response — eso
+  // no le llega a los Server Components) para no tener que volver a
+  // llamar auth.getUser() ahí adentro: esa segunda llamada (red hasta
+  // Supabase en us-west-2) se repetía en CADA navegación bajo /admin/*
+  // además de la que ya hace este middleware, y era la causa real de la
+  // lentitud entre pantallas.
+  request.headers.set('x-user-email', user.email ?? '');
+
+  const response = NextResponse.next({ request });
+  cookiesParaRefrescar.forEach(({ name, value, options }) =>
+    response.cookies.set(name, value, options)
+  );
 
   return response;
 }

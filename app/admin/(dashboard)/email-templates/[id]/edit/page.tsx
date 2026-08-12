@@ -19,7 +19,7 @@ export default async function EditEmailTemplatePage({ params }: { params: { id: 
 
   return (
     <div>
-      <h1 className="text-lg font-semibold text-slate-800">Editar plantilla — {template.name}</h1>
+      <h1 className="text-lg font-extrabold text-one-oscuro">Editar plantilla — {template.name}</h1>
       <EmailTemplateForm action={accionConId} botonTexto="Guardar cambios" valoresIniciales={template} />
     </div>
   );

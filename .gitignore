@@ -24,3 +24,6 @@ lib/supabase/database.types.ts
 # Sistema operativo / editor
 .DS_Store
 *.log
+
+# Screenshots/snapshots de pruebas con Playwright MCP
+.playwright-mcp/

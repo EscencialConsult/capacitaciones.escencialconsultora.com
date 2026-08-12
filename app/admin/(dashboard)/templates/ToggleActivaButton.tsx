@@ -11,7 +11,7 @@ export function ToggleActivaButton({ templateId, activa }: { templateId: string;
       type="button"
       disabled={pending}
       onClick={() => startTransition(() => toggleTemplateActive(templateId, !activa))}
-      className="text-slate-500 hover:text-slate-800 disabled:opacity-50"
+      className="text-one-oscuro/50 hover:text-one-oscuro disabled:opacity-50"
     >
       {activa ? 'Desactivar' : 'Activar'}
     </button>

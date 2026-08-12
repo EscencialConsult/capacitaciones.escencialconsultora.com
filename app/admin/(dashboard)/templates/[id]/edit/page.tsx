@@ -23,7 +23,7 @@ export default async function EditTemplatePage({ params }: { params: { id: strin
 
   return (
     <div>
-      <h1 className="text-lg font-semibold text-slate-800">Editar plantilla — {template.name}</h1>
+      <h1 className="text-lg font-extrabold text-one-oscuro">Editar plantilla — {template.name}</h1>
       <TemplateForm
         action={accionConId}
         categorias={categorias ?? []}

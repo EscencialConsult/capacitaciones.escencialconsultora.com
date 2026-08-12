@@ -16,7 +16,7 @@ export function UserActions({
   const [error, setError] = useState<string | null>(null);
 
   if (esUsuarioActual) {
-    return <span className="text-xs text-slate-400">(vos)</span>;
+    return <span className="text-xs text-one-oscuro/40">(vos)</span>;
   }
 
   return (
@@ -31,7 +31,7 @@ export function UserActions({
             if (r?.error) setError(r.error);
           })
         }
-        className="text-slate-500 hover:text-slate-800 disabled:opacity-50"
+        className="text-one-oscuro/50 hover:text-one-oscuro disabled:opacity-50"
       >
         {baneado ? 'Habilitar' : 'Deshabilitar'}
       </button>
@@ -46,11 +46,11 @@ export function UserActions({
             if (r?.error) setError(r.error);
           });
         }}
-        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+        className="text-one-rojo/70 hover:text-one-rojo disabled:opacity-50"
       >
         Eliminar
       </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-one-rojo">{error}</span>}
     </div>
   );
 }

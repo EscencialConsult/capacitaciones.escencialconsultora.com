@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from 'react-dom';
 import { createUser } from '../actions';
+import { FormInput } from '../../FormInput';
 
 function BotonCrear() {
   const { pending } = useFormStatus();
@@ -9,7 +10,7 @@ function BotonCrear() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? 'Creando...' : 'Crear usuario'}
     </button>
@@ -21,39 +22,16 @@ export default function NewUserPage() {
 
   return (
     <div className="max-w-md">
-      <h1 className="text-lg font-semibold text-slate-800">Nuevo usuario del panel</h1>
-      <p className="mt-1 text-sm text-slate-500">
+      <h1 className="text-lg font-extrabold text-one-oscuro">Nuevo usuario del panel</h1>
+      <p className="mt-1 text-sm text-one-oscuro/60">
         Va a poder loguearse en /admin/login con este email y contraseña, con el mismo acceso que vos.
       </p>
 
-      <form action={formAction} className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-5">
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-azul focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="password">
-            Contraseña
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            minLength={6}
-            required
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-azul focus:outline-none"
-          />
-        </div>
+      <form action={formAction} className="mt-6 space-y-4 rounded-one-lg bg-one-oscuro/5 p-5">
+        <FormInput id="email" name="email" label="Email" type="email" required />
+        <FormInput id="password" name="password" label="Contraseña" type="password" minLength={6} required />
 
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}
 
         <BotonCrear />
       </form>

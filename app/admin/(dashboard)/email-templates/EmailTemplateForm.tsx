@@ -2,12 +2,9 @@
 
 import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
+import { FormInput, inputClass, labelClass } from '../FormInput';
 
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
-
-const campo =
-  'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-azul focus:outline-none';
-const etiqueta = 'block text-sm font-medium text-slate-700';
 
 function BotonGuardar({ texto }: { texto: string }) {
   const { pending } = useFormStatus();
@@ -15,7 +12,7 @@ function BotonGuardar({ texto }: { texto: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? 'Guardando...' : texto}
     </button>
@@ -37,22 +34,17 @@ export function EmailTemplateForm({
   return (
     <form action={formAction} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <div>
-          <label className={etiqueta} htmlFor="name">
-            Nombre
-          </label>
-          <input id="name" name="name" required defaultValue={valoresIniciales?.name} className={campo} />
-        </div>
+        <FormInput id="name" name="name" label="Nombre" required defaultValue={valoresIniciales?.name} />
 
         <div>
-          <label className={etiqueta} htmlFor="is_active">
+          <label className={labelClass} htmlFor="is_active">
             Estado
           </label>
           <select
             id="is_active"
             name="is_active"
             defaultValue={String(valoresIniciales?.is_active ?? true)}
-            className={campo}
+            className={inputClass}
           >
             <option value="true">Activa</option>
             <option value="false">Inactiva</option>
@@ -60,7 +52,7 @@ export function EmailTemplateForm({
         </div>
 
         <div>
-          <label className={etiqueta} htmlFor="html_content">
+          <label className={labelClass} htmlFor="html_content">
             HTML del email
           </label>
           <textarea
@@ -70,23 +62,26 @@ export function EmailTemplateForm({
             rows={18}
             value={html}
             onChange={(e) => setHtml(e.target.value)}
-            className={`${campo} font-mono text-xs`}
+            className={`${inputClass} font-mono text-xs`}
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-one-oscuro/40">
             Placeholders fijos: {'{{nombre}}'}, {'{{apellido}}'}, {'{{contenido}}'}, {'{{whatsapp_url}}'},{' '}
             {'{{asesora_nombre}}'}. Usá tablas + estilos inline (no {'<style>'} en el head) para que se vea
             bien en Gmail/Outlook.
           </p>
         </div>
 
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}
 
         <BotonGuardar texto={botonTexto} />
       </div>
 
       <div>
-        <p className={etiqueta}>Vista previa en vivo</p>
-        <div className="mt-1 overflow-hidden rounded-lg border border-slate-300" style={{ height: 600 }}>
+        <p className={labelClass}>Vista previa en vivo</p>
+        <div
+          className="mt-1 overflow-hidden rounded-one-md border border-one-oscuro/10"
+          style={{ height: 600 }}
+        >
           <iframe title="Vista previa" srcDoc={html} className="h-full w-full" sandbox="" />
         </div>
       </div>

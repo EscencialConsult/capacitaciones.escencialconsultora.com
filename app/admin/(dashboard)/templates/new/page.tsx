@@ -10,7 +10,7 @@ export default async function NewTemplatePage() {
 
   return (
     <div>
-      <h1 className="text-lg font-semibold text-slate-800">Nueva plantilla de landing</h1>
+      <h1 className="text-lg font-extrabold text-one-oscuro">Nueva plantilla de landing</h1>
       <TemplateForm action={createTemplate} categorias={categorias ?? []} botonTexto="Crear plantilla" />
     </div>
   );

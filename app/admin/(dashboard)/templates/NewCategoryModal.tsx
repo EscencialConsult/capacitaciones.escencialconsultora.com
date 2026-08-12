@@ -10,7 +10,7 @@ function BotonCrear() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-azul px-4 py-2 text-sm font-semibold text-white hover:bg-azul-oscuro disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? 'Creando...' : 'Crear'}
     </button>
@@ -31,23 +31,23 @@ export function NewCategoryModal({
   }, [state, onCreated]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="text-sm font-semibold text-slate-800">Nueva categoría</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-one-oscuro/60 p-4">
+      <div className="w-full max-w-sm rounded-one-lg bg-one-blanco p-6 shadow-sm">
+        <h2 className="text-sm font-bold text-one-oscuro">Nueva categoría</h2>
         <form action={formAction} className="mt-4 space-y-3">
           <input
             name="name"
             autoFocus
             required
             placeholder="Ej: Productos"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-azul focus:outline-none"
+            className="w-full rounded-one-sm border border-one-oscuro/15 bg-one-blanco px-3 py-2 text-sm text-one-oscuro outline-none focus:border-one-fucsia focus:ring-2 focus:ring-one-fucsia/20"
           />
-          {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}
           <div className="flex justify-end gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+              className="rounded-full px-6 py-2.5 text-sm font-bold text-one-oscuro/70 transition-all duration-300 hover:bg-one-oscuro/5"
             >
               Cancelar
             </button>

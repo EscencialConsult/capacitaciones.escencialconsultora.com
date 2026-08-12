@@ -14,7 +14,7 @@ export function CopyPromptButton() {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
       }}
-      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+      className="rounded-full border border-one-oscuro/15 px-6 py-2.5 text-sm font-bold text-one-oscuro transition-all duration-300 hover:-translate-y-0.5 hover:bg-one-oscuro/5"
     >
       {copiado ? '✓ Copiado' : 'Copiar prompt (diseño + datos de la campaña)'}
     </button>
