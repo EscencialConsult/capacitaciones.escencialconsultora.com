@@ -27,8 +27,10 @@ const campaignSchema = z.object({
   // Paso 1 es obligatorio (toda campaña manda al menos un email). Los
   // pasos 2 a 4 son opcionales — se saltean solos si asunto Y contenido
   // quedan vacíos, mismo criterio que template_base_N vacío en el
-  // sistema viejo (nunca rellenar con texto tipo "N/A").
-  step1_email_template_id: z.string().uuid('Elegí una plantilla de email.'),
+  // sistema viejo (nunca rellenar con texto tipo "N/A"). El DISEÑO de
+  // email es opcional en los 4 — sin uno elegido, se manda con el HTML
+  // simple de respaldo (ver HTML_EMAIL_BASE / process-pending.ts).
+  step1_email_template_id: z.string().optional().default(''),
   step1_offset_days: z.coerce.number().int().min(0).default(0),
   step1_subject: z.string().trim().min(1, 'Falta el asunto del email 1.'),
   step1_content: z.string().trim().min(1, 'Falta el contenido del email 1.'),
@@ -85,12 +87,7 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
   }
   const d = parsed.data;
-
   const pasos = parsePasos(d);
-  const pasoSinDiseno = pasos.find((p) => !p.email_template_id);
-  if (pasoSinDiseno) {
-    return { error: `Falta elegir el diseño de email para el paso ${pasoSinDiseno.n}.` };
-  }
 
   const supabase = createSupabaseServiceClient();
 
@@ -121,7 +118,7 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
     pasos.map((p) => ({
       landing_id: landing.id,
       step_number: p.n,
-      email_template_id: p.email_template_id,
+      email_template_id: p.email_template_id || null,
       offset_days: p.offset_days,
       subject: p.subject,
       content: p.content,
@@ -155,12 +152,7 @@ export async function updateLanding(
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
   }
   const d = parsed.data;
-
   const pasos = parsePasos(d);
-  const pasoSinDiseno = pasos.find((p) => !p.email_template_id);
-  if (pasoSinDiseno) {
-    return { error: `Falta elegir el diseño de email para el paso ${pasoSinDiseno.n}.` };
-  }
 
   const supabase = createSupabaseServiceClient();
 
@@ -199,7 +191,7 @@ export async function updateLanding(
     pasos.map((p) => ({
       landing_id: landingId,
       step_number: p.n,
-      email_template_id: p.email_template_id,
+      email_template_id: p.email_template_id || null,
       offset_days: p.offset_days,
       subject: p.subject,
       content: p.content,

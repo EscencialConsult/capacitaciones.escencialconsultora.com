@@ -167,6 +167,36 @@ export const HTML_BASE = `<!DOCTYPE html>
 </html>`;
 
 /**
+ * Email "simple" — se usa en dos lugares: (1) como respaldo cuando un
+ * paso de campaña queda SIN diseño de email elegido (ver
+ * lib/email/process-pending.ts, el diseño ahora es opcional), y (2)
+ * como contenido inicial del modal "+ Crear diseño" en el formulario
+ * de campaña, para no arrancar de un textarea vacío. Placeholders que
+ * process-pending.ts sabe reemplazar: {{nombre}}, {{contenido}},
+ * {{whatsapp_url}}, {{asesora_nombre}}.
+ */
+export const HTML_EMAIL_BASE = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Escencial Consultora</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #1a181d; line-height: 1.5;">
+
+<p>Hola {{nombre}},</p>
+
+<p>{{contenido}}</p>
+
+<p><a href="{{whatsapp_url}}">Hablar por WhatsApp</a></p>
+
+<p style="margin-top: 24px; font-size: 12px; color: #7880a4;">
+  {{asesora_nombre}} — Escencial Consultora
+</p>
+
+</body>
+</html>`;
+
+/**
  * Datos reales de contacto de Escencial Consultora, sacados del sitio
  * en vivo (escencialconsultora.com.ar) el 2026-08-12 — nunca inventar
  * otra dirección/teléfono/red social acá ni dejar que la IA los invente

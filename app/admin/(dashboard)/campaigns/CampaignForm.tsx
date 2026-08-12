@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
+import { NewEmailTemplateModal } from './NewEmailTemplateModal';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
 type VariableSchema = { key: string; label: string; type: 'text' | 'textarea'; description?: string };
@@ -50,11 +51,13 @@ function BloqueEmail({
   obligatorio,
   emailTemplates,
   valores,
+  onCrearDiseno,
 }: {
   numero: 1 | 2 | 3 | 4;
   obligatorio: boolean;
   emailTemplates: EmailPlantilla[];
   valores?: PasoExistente;
+  onCrearDiseno: (numero: 1 | 2 | 3 | 4) => void;
 }) {
   return (
     <section className="rounded-one-lg bg-one-oscuro/5 p-5">
@@ -69,17 +72,28 @@ function BloqueEmail({
       )}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_140px]">
         <div>
-          <label className={labelClass} htmlFor={`step${numero}_email_template_id`}>
-            Diseño de email
-          </label>
+          <div className="flex items-center justify-between">
+            <label className={labelClass} htmlFor={`step${numero}_email_template_id`}>
+              Diseño de email (opcional)
+            </label>
+            <button
+              type="button"
+              onClick={() => onCrearDiseno(numero)}
+              className="text-xs text-one-fucsia hover:underline"
+            >
+              + Crear diseño
+            </button>
+          </div>
+          {/* Sin diseño elegido, el email se manda igual con un HTML simple
+              de respaldo (ver HTML_EMAIL_BASE) — el diseño de una plantilla
+              guardada nunca es un requisito para poder mandar la campaña. */}
           <select
             id={`step${numero}_email_template_id`}
             name={`step${numero}_email_template_id`}
-            required={obligatorio}
             defaultValue={valores?.email_template_id ?? ''}
             className={inputClass}
           >
-            <option value="">{obligatorio ? 'Elegí un diseño' : '— No usar este paso —'}</option>
+            <option value="">— Email simple, sin diseño elegido —</option>
             {emailTemplates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -146,6 +160,28 @@ export function CampaignForm({
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const pasoPorNumero = (n: number) => valoresIniciales?.pasos.find((p) => p.step_number === n);
+
+  // Se levanta a estado local para poder agregarle al toque el diseño
+  // que se cree desde el modal de acceso directo (botón "+ Crear
+  // diseño" de cada paso), sin recargar la página ni perder lo que ya
+  // se había cargado en el resto del formulario.
+  const [listaEmailTemplates, setListaEmailTemplates] = useState(emailTemplates);
+  const [pasoModalDiseno, setPasoModalDiseno] = useState<1 | 2 | 3 | 4 | null>(null);
+  // El <select> de diseño es no controlado (defaultValue), igual que el
+  // resto del form — pisar su .value apenas se crea el diseño nuevo se
+  // hacía ANTES de que React terminara de agregar la <option> nueva al
+  // DOM (setListaEmailTemplates es async), así que el navegador ignoraba
+  // la asignación. Este efecto corre después de ese re-render, cuando la
+  // <option> ya existe de verdad.
+  const [porSeleccionar, setPorSeleccionar] = useState<{ numero: 1 | 2 | 3 | 4; templateId: string } | null>(null);
+  useEffect(() => {
+    if (!porSeleccionar) return;
+    const select = document.getElementById(
+      `step${porSeleccionar.numero}_email_template_id`
+    ) as HTMLSelectElement | null;
+    if (select) select.value = porSeleccionar.templateId;
+    setPorSeleccionar(null);
+  }, [porSeleccionar, listaEmailTemplates]);
 
   // La plantilla elegida decide qué campos de variables se muestran acá
   // abajo — cada plantilla declara las suyas sola (ver
@@ -232,6 +268,7 @@ export function CampaignForm({
   }
 
   return (
+    <>
     <form action={formAction} className="mt-6 space-y-6">
       <div className="rounded-one-lg border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-5">
         <div className="flex items-center justify-between">
@@ -370,14 +407,53 @@ export function CampaignForm({
         </div>
       </section>
 
-      <BloqueEmail numero={1} obligatorio emailTemplates={emailTemplates} valores={pasoPorNumero(1)} />
-      <BloqueEmail numero={2} obligatorio={false} emailTemplates={emailTemplates} valores={pasoPorNumero(2)} />
-      <BloqueEmail numero={3} obligatorio={false} emailTemplates={emailTemplates} valores={pasoPorNumero(3)} />
-      <BloqueEmail numero={4} obligatorio={false} emailTemplates={emailTemplates} valores={pasoPorNumero(4)} />
+      <BloqueEmail
+        numero={1}
+        obligatorio
+        emailTemplates={listaEmailTemplates}
+        valores={pasoPorNumero(1)}
+        onCrearDiseno={setPasoModalDiseno}
+      />
+      <BloqueEmail
+        numero={2}
+        obligatorio={false}
+        emailTemplates={listaEmailTemplates}
+        valores={pasoPorNumero(2)}
+        onCrearDiseno={setPasoModalDiseno}
+      />
+      <BloqueEmail
+        numero={3}
+        obligatorio={false}
+        emailTemplates={listaEmailTemplates}
+        valores={pasoPorNumero(3)}
+        onCrearDiseno={setPasoModalDiseno}
+      />
+      <BloqueEmail
+        numero={4}
+        obligatorio={false}
+        emailTemplates={listaEmailTemplates}
+        valores={pasoPorNumero(4)}
+        onCrearDiseno={setPasoModalDiseno}
+      />
 
       {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}
 
       <BotonGuardar texto={botonTexto} textoPendiente={botonTextoPendiente} />
     </form>
+
+    {/* Fuera del <form> a propósito: el modal tiene su propio <form> para
+        crear el diseño, y un <form> no puede anidar otro <form> — eso
+        rompía la hidratación de React. */}
+    {pasoModalDiseno && (
+      <NewEmailTemplateModal
+        onClose={() => setPasoModalDiseno(null)}
+        onCreated={(plantilla) => {
+          setListaEmailTemplates((prev) => [...prev, plantilla]);
+          setPorSeleccionar({ numero: pasoModalDiseno, templateId: plantilla.id });
+          setPasoModalDiseno(null);
+        }}
+      />
+    )}
+    </>
   );
 }

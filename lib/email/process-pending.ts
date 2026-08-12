@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { replacePlaceholders } from '@/lib/templates';
+import { HTML_EMAIL_BASE } from '@/lib/landing-template-defaults';
 
 /**
  * Reemplazo de enviarPendientes (Script B del sistema viejo). Recorre
@@ -73,15 +74,19 @@ export async function processPendingEmails() {
       email_templates: { html_content: string } | null;
     } | null;
 
-    if (!lead || !paso || !paso.email_templates) {
-      await marcarError(supabase, envio.id, 'Faltan datos de lead o de plantilla de email.');
+    if (!lead || !paso) {
+      await marcarError(supabase, envio.id, 'Faltan datos de lead o de paso de campaña.');
       resultado.errores++;
       continue;
     }
 
     try {
       const whatsappUrl = `${webappUrl}/api/track?lead_id=${envio.lead_id}&step=${paso.step_number}`;
-      const html = replacePlaceholders(paso.email_templates.html_content, {
+      // El diseño de email es opcional por paso — sin uno elegido, se
+      // manda con el HTML "simple" de respaldo en vez de bloquear el
+      // envío (ver HTML_EMAIL_BASE).
+      const htmlBase = paso.email_templates?.html_content ?? HTML_EMAIL_BASE;
+      const html = replacePlaceholders(htmlBase, {
         nombre: lead.first_name ?? '',
         apellido: lead.last_name ?? '',
         contenido: paso.content,
