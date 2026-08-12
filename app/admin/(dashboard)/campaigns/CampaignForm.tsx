@@ -162,7 +162,7 @@ export function CampaignForm({
       <section className="rounded-one-lg bg-one-oscuro/5 p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-one-oscuro">Datos generales</h2>
-          <CopyLandingPromptButton />
+          <CopyLandingPromptButton variables={variablesDeLaPlantilla} />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
