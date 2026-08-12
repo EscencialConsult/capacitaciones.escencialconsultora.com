@@ -208,14 +208,22 @@ ${INFO_FOOTER_ESCENCIAL}
 Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): este HTML lo subo como plantilla nueva en el panel — el nombre interno de la plantilla y la categoría los cargo yo directo ahí, no hace falta que me los preguntes.`;
 }
 
+/**
+ * El bloque A del resultado sale en JSON (no lista de texto) a
+ * propósito: plantillas ricas (hero + beneficios + planes + FAQ...)
+ * pueden tener 40-60 variables — completarlas una por una a mano en el
+ * formulario no es viable. El panel tiene un cuadro "Pegar JSON" en
+ * /admin/campaigns/new que toma este bloque tal cual y completa todos
+ * los campos de variables solo (ver CampaignForm.tsx → aplicarJson).
+ */
 export function armarPromptCampanaNueva(variables: { key: string; label: string }[]) {
   const listaVariables = variables.length
-    ? variables.map((v) => `   - ${v.label} (clave interna: ${v.key})`).join('\n')
+    ? variables.map((v) => `   - ${v.key} → ${v.label}`).join('\n')
     : '   (esta plantilla no tiene ningún campo de texto propio — no hace falta preguntar nada acá)';
 
-  const formatoResumenVariables = variables.length
-    ? variables.map((v) => `${v.label}: ...`).join('\n')
-    : '(sin variables de contenido en esta plantilla)';
+  const jsonEjemplo = variables.length
+    ? `{\n${variables.map((v) => `  "${v.key}": "..."`).join(',\n')}\n}`
+    : '(sin variables de contenido en esta plantilla — omití el bloque A)';
 
   return `Necesito armar una campaña nueva para mi plataforma, usando una plantilla de landing que ya existe — el diseño ya está resuelto, no me preguntes nada de estilo ni me generes HTML. Antes de generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a cada una:
 
@@ -228,14 +236,18 @@ export function armarPromptCampanaNueva(variables: { key: string; label: string 
    - Asunto del email.
    - Contenido/speech de ese paso puntual.
 
-4. El contenido real para cada uno de estos campos que tiene la plantilla que elegiste (nunca inventes vos el contenido de negocio, eso lo doy yo):
+4. El contenido real para cada uno de estos campos que tiene la plantilla que elegiste (nunca inventes vos el contenido de negocio, eso lo doy yo). Te dejo la clave interna de cada uno porque las vas a necesitar en el bloque A de la respuesta:
 ${listaVariables}
 
-Con esas respuestas, generame un resumen con este formato exacto, nada de explicaciones antes ni después:
+Con esas respuestas, generame DOS bloques, nada de explicaciones antes ni después:
+
+A) Un JSON válido (sin comentarios, sin texto alrededor) con exactamente estas claves — cada una con el valor real que te di en el punto 4:
+
+${jsonEjemplo}
+
+B) El resto de los datos, en este formato exacto:
 
 ---
-${formatoResumenVariables}
-
 Asesora — nombre: ...
 Asesora — WhatsApp: ...
 Mensaje prellenado de WhatsApp: ...
@@ -246,5 +258,5 @@ Email 3 — días: ... / asunto: ... / contenido: ... (o "no usar")
 Email 4 — días: ... / asunto: ... / contenido: ... (o "no usar")
 ---
 
-Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): este resumen lo uso para completar el formulario de campaña nueva, ya conectado a la plantilla elegida.`;
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el JSON (A) lo pego directo en el cuadro "Pegar JSON" del formulario de campaña y completa solo todos los campos de variables; el resto (B) lo completo a mano, son pocos campos.`;
 }

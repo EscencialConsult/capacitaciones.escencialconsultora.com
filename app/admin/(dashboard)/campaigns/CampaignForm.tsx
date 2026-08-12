@@ -157,6 +157,45 @@ export function CampaignForm({
     [templates, templateId]
   );
 
+  // Completar a mano campo por campo no es viable en plantillas ricas
+  // (hero + beneficios + planes + FAQ pueden ser 40-60 variables). Este
+  // cuadro toma el bloque JSON que devuelve el prompt (ver
+  // armarPromptCampanaNueva) y pisa el valor de cada <input>/<textarea>
+  // por su id `var_<clave>` directo en el DOM — son campos no
+  // controlados, así que esto no pelea con React, y lo que quede
+  // cargado ahí es lo que se manda al enviar el formulario igual.
+  const [jsonPegado, setJsonPegado] = useState('');
+  const [mensajeJson, setMensajeJson] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+
+  function aplicarJson() {
+    let valores: unknown;
+    try {
+      valores = JSON.parse(jsonPegado);
+    } catch {
+      setMensajeJson({ tipo: 'error', texto: 'Ese texto no es JSON válido — revisá que empiece con { y termine con }.' });
+      return;
+    }
+    if (typeof valores !== 'object' || valores === null || Array.isArray(valores)) {
+      setMensajeJson({ tipo: 'error', texto: 'Tiene que ser un objeto {"clave": "valor"}, no una lista ni un texto suelto.' });
+      return;
+    }
+    let completados = 0;
+    for (const v of variablesDeLaPlantilla) {
+      const valor = (valores as Record<string, unknown>)[v.key];
+      if (valor === undefined) continue;
+      const el = document.getElementById(`var_${v.key}`) as HTMLInputElement | HTMLTextAreaElement | null;
+      if (el) {
+        el.value = String(valor);
+        completados++;
+      }
+    }
+    setMensajeJson(
+      completados > 0
+        ? { tipo: 'ok', texto: `Completé ${completados} de ${variablesDeLaPlantilla.length} campos. Revisalos antes de guardar.` }
+        : { tipo: 'error', texto: 'No encontré ninguna clave que coincida con los campos de esta plantilla.' }
+    );
+  }
+
   return (
     <form action={formAction} className="mt-6 space-y-6">
       <section className="rounded-one-lg bg-one-oscuro/5 p-5">
@@ -205,6 +244,36 @@ export function CampaignForm({
             </select>
           </div>
         </div>
+
+        {variablesDeLaPlantilla.length > 0 && (
+          <div className="mt-4 rounded-one-sm border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-4">
+            <label className={labelClass} htmlFor="json_variables">
+              Pegar JSON generado por la IA (opcional, completa los campos de abajo solo)
+            </label>
+            <textarea
+              id="json_variables"
+              rows={3}
+              value={jsonPegado}
+              onChange={(e) => setJsonPegado(e.target.value)}
+              placeholder={'{\n  "titulo": "...",\n  "precio_plan_1": "..."\n}'}
+              className={`${inputClass} font-mono text-xs`}
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={aplicarJson}
+                className="rounded-full bg-one-fucsia px-4 py-1.5 text-xs font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
+              >
+                Completar campos
+              </button>
+              {mensajeJson && (
+                <span className={`text-xs ${mensajeJson.tipo === 'ok' ? 'text-emerald-600' : 'text-one-rojo'}`}>
+                  {mensajeJson.texto}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {variablesDeLaPlantilla.length === 0 && (
