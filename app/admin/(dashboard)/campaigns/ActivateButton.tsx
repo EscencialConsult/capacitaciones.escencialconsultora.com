@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { activateCampaign } from './actions';
 
-export function ActivateButton({ landingId, slug }: { landingId: string; slug: string }) {
+export function ActivateButton({ campaignId, slug }: { campaignId: string; slug: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -14,11 +14,11 @@ export function ActivateButton({ landingId, slug }: { landingId: string; slug: s
         disabled={pending}
         onClick={() => {
           setError(null);
-          if (!confirm(`¿Activar esta campaña? A partir de ahora /${slug} va a estar público de verdad.`)) {
+          if (!confirm(`¿Activar esta campaña? A partir de ahora /${slug} va a mostrar su contenido de verdad.`)) {
             return;
           }
           startTransition(async () => {
-            const r = await activateCampaign(landingId);
+            const r = await activateCampaign(campaignId);
             if (r?.error) setError(r.error);
           });
         }}

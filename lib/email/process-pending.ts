@@ -25,7 +25,7 @@ export async function processPendingEmails() {
     .from('email_sends')
     .select(
       `id, lead_id, landing_email_step_id,
-       leads(email, first_name, last_name, landing_id, landings(advisor_name, whatsapp_number)),
+       leads(email, first_name, last_name, campaign_id, campaigns(advisor_name, whatsapp_number)),
        landing_email_steps(subject, content, email_template_id, step_number, email_templates(html_content))`
     )
     .eq('status', 'pending')
@@ -64,8 +64,8 @@ export async function processPendingEmails() {
       email: string;
       first_name: string | null;
       last_name: string | null;
-      landing_id: string;
-      landings: { advisor_name: string | null; whatsapp_number: string | null } | null;
+      campaign_id: string;
+      campaigns: { advisor_name: string | null; whatsapp_number: string | null } | null;
     } | null;
     const paso = envio.landing_email_steps as unknown as {
       subject: string;
@@ -91,7 +91,7 @@ export async function processPendingEmails() {
         apellido: lead.last_name ?? '',
         contenido: paso.content,
         whatsapp_url: whatsappUrl,
-        asesora_nombre: lead.landings?.advisor_name ?? '',
+        asesora_nombre: lead.campaigns?.advisor_name ?? '',
       });
 
       const respuesta = await fetch('https://api.brevo.com/v3/smtp/email', {

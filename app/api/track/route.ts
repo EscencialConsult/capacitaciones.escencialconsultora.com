@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
   const { data: lead, error: leadError } = await supabase
     .from('leads')
-    .select('id, landing_id, whatsapp_clicked_at')
+    .select('id, campaign_id, whatsapp_clicked_at')
     .eq('id', leadId)
     .single();
 
@@ -49,14 +49,14 @@ export async function GET(request: Request) {
       .eq('id', leadId);
   }
 
-  const { data: landing } = await supabase
-    .from('landings')
+  const { data: campana } = await supabase
+    .from('campaigns')
     .select('whatsapp_number, whatsapp_message')
-    .eq('id', lead.landing_id)
+    .eq('id', lead.campaign_id)
     .single();
 
-  const numero = landing?.whatsapp_number ?? '';
-  const mensaje = landing?.whatsapp_message ?? '';
+  const numero = campana?.whatsapp_number ?? '';
+  const mensaje = campana?.whatsapp_message ?? '';
   const urlWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 
   return NextResponse.redirect(urlWhatsapp);

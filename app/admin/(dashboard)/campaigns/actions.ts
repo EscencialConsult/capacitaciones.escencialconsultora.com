@@ -5,19 +5,13 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
-// Slugs que nunca pueden ser el nombre de una landing — colisionan con
-// rutas reales de la app (ver app/[slug]/route.ts).
-const SLUGS_RESERVADOS = ['admin', 'api'];
-
 const campaignSchema = z.object({
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9-]+$/, 'El link solo puede tener minúsculas, números y guiones.')
-    .refine((s) => !SLUGS_RESERVADOS.includes(s), 'Ese link está reservado, elegí otro.'),
   name: z.string().trim().min(1, 'Falta el nombre interno.'),
-  template_id: z.string().uuid('Elegí una plantilla.'),
+  // A qué landing (el link público) pertenece esta campaña — el link/slug
+  // en sí ya no se elige acá, es propiedad de la landing (ver
+  // landings/actions.ts). Se elige una existente o se crea una nueva al
+  // vuelo desde el modal "+ Crear landing nueva" en CampaignForm.
+  landing_id: z.string().uuid('Elegí una landing.'),
   advisor_name: z.string().trim().optional().default(''),
   whatsapp_number: z.string().trim().optional().default(''),
   // Mensaje PRELLENADO que manda EL LEAD al asesor por WhatsApp al
@@ -49,11 +43,12 @@ const campaignSchema = z.object({
 });
 
 /**
- * Las variables de la landing (título, subtítulo, precio, lo que sea)
+ * Las variables de contenido (título, subtítulo, precio, lo que sea)
  * ya no son un set fijo — se leen directo de cualquier campo `var_*`
- * que haya en el formulario, sea cual sea la plantilla elegida (esos
- * campos los arma CampaignForm dinámicamente a partir de
- * template.variables_schema). Nada que mantener sincronizado acá.
+ * que haya en el formulario, sea cual sea la plantilla de la landing
+ * elegida (esos campos los arma CampaignForm dinámicamente a partir de
+ * landing.landing_templates.variables_schema). Nada que mantener
+ * sincronizado acá.
  */
 function extraerVariables(formData: FormData): Record<string, string> {
   const variables: Record<string, string> = {};
@@ -75,11 +70,12 @@ function parsePasos(d: z.infer<typeof campaignSchema>) {
 }
 
 /**
- * Toda campaña nueva arranca en 'draft' siempre — no existe un link
- * público todavía. Pasar a landing activa es la acción separada
- * activateCampaign, nunca un valor que se elige acá.
+ * Toda campaña nueva arranca en 'draft' siempre — no está sirviendo
+ * contenido todavía aunque su landing ya exista y esté activa. Pasar a
+ * "campaña activa" es la acción separada activateCampaign, nunca un
+ * valor que se elige acá.
  */
-export async function createLanding(_prevState: { error?: string } | undefined, formData: FormData) {
+export async function createCampaign(_prevState: { error?: string } | undefined, formData: FormData) {
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const parsed = campaignSchema.safeParse(raw);
 
@@ -91,12 +87,11 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: landing, error: landingError } = await supabase
-    .from('landings')
+  const { data: campana, error: campanaError } = await supabase
+    .from('campaigns')
     .insert({
-      slug: d.slug,
+      landing_id: d.landing_id,
       name: d.name,
-      template_id: d.template_id,
       status: 'draft',
       advisor_name: d.advisor_name || null,
       whatsapp_number: d.whatsapp_number || null,
@@ -106,17 +101,14 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
     .select('id')
     .single();
 
-  if (landingError) {
-    if (landingError.code === '23505') {
-      return { error: 'Ya existe una campaña con ese link.' };
-    }
-    console.error('Error creando campaña:', landingError);
+  if (campanaError) {
+    console.error('Error creando campaña:', campanaError);
     return { error: 'No se pudo crear la campaña.' };
   }
 
   const { error: stepError } = await supabase.from('landing_email_steps').insert(
     pasos.map((p) => ({
-      landing_id: landing.id,
+      campaign_id: campana.id,
       step_number: p.n,
       email_template_id: p.email_template_id || null,
       offset_days: p.offset_days,
@@ -136,12 +128,12 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
 
 /**
  * Solo se puede editar una campaña mientras sigue en 'draft' — una vez
- * activada, el contenido queda fijo y la pantalla de esa landing pasa a
- * ser de analytics, no de edición (ver landings/page.tsx). El chequeo se
- * repite acá server-side, no solo ocultando el link en la UI.
+ * activada, el contenido queda fijo y la pantalla de esa campaña pasa a
+ * ser de analytics/leads, no de edición (ver campaigns/[id]/leads). El
+ * chequeo se repite acá server-side, no solo ocultando el link en la UI.
  */
-export async function updateLanding(
-  landingId: string,
+export async function updateCampaign(
+  campaignId: string,
   _prevState: { error?: string } | undefined,
   formData: FormData
 ) {
@@ -156,40 +148,36 @@ export async function updateLanding(
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: actual } = await supabase.from('landings').select('status').eq('id', landingId).single();
+  const { data: actual } = await supabase.from('campaigns').select('status').eq('id', campaignId).single();
   if (!actual || actual.status !== 'draft') {
     return { error: 'Esta campaña ya está activa — el contenido no se puede editar más desde acá.' };
   }
 
-  const { error: landingError } = await supabase
-    .from('landings')
+  const { error: campanaError } = await supabase
+    .from('campaigns')
     .update({
-      slug: d.slug,
+      landing_id: d.landing_id,
       name: d.name,
-      template_id: d.template_id,
       advisor_name: d.advisor_name || null,
       whatsapp_number: d.whatsapp_number || null,
       whatsapp_message: d.whatsapp_message || null,
       variables: extraerVariables(formData),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', landingId);
+    .eq('id', campaignId);
 
-  if (landingError) {
-    if (landingError.code === '23505') {
-      return { error: 'Ya existe otra campaña con ese link.' };
-    }
-    console.error('Error actualizando campaña:', landingError);
+  if (campanaError) {
+    console.error('Error actualizando campaña:', campanaError);
     return { error: 'No se pudo guardar la campaña.' };
   }
 
   // Se reemplazan todos los pasos — más simple y seguro que tratar de
   // diffear altas/bajas/cambios paso por paso, y de todos modos ningún
   // email_send pudo haberse generado todavía (la campaña ni es 'active').
-  await supabase.from('landing_email_steps').delete().eq('landing_id', landingId);
+  await supabase.from('landing_email_steps').delete().eq('campaign_id', campaignId);
   const { error: stepError } = await supabase.from('landing_email_steps').insert(
     pasos.map((p) => ({
-      landing_id: landingId,
+      campaign_id: campaignId,
       step_number: p.n,
       email_template_id: p.email_template_id || null,
       offset_days: p.offset_days,
@@ -208,17 +196,41 @@ export async function updateLanding(
 }
 
 /**
- * "Activar" es lo único que convierte una campaña en landing de verdad:
- * a partir de acá /{slug} responde de verdad (ver app/[slug]/route.ts,
- * que solo sirve landings con status='active') y esa fila pasa a
- * aparecer en /admin/landings en vez de en /admin/campaigns.
+ * "Activar" es lo que hace que una campaña empiece a servir contenido
+ * de verdad en /{slug} de su landing (ver app/[slug]/route.ts, que
+ * busca la campaña con status='active' de esa landing). Como mucho una
+ * campaña activa por landing a la vez (reforzado también a nivel base,
+ * ver campaigns_one_active_per_landing_idx) — activar esta pausa
+ * cualquier otra que ya estuviera activa en la misma landing, y prende
+ * la landing por las dudas estuviera desactivada.
  */
-export async function activateCampaign(landingId: string) {
+export async function activateCampaign(campaignId: string) {
   const supabase = createSupabaseServiceClient();
+
+  const { data: campana } = await supabase
+    .from('campaigns')
+    .select('id, landing_id, status')
+    .eq('id', campaignId)
+    .single();
+
+  if (!campana) {
+    return { error: 'No se encontró la campaña.' };
+  }
+  if (campana.status !== 'draft') {
+    return { error: 'Solo se puede activar una campaña que esté en borrador.' };
+  }
+
+  await supabase
+    .from('campaigns')
+    .update({ status: 'paused', updated_at: new Date().toISOString() })
+    .eq('landing_id', campana.landing_id)
+    .eq('status', 'active')
+    .neq('id', campaignId);
+
   const { error } = await supabase
-    .from('landings')
+    .from('campaigns')
     .update({ status: 'active', updated_at: new Date().toISOString() })
-    .eq('id', landingId)
+    .eq('id', campaignId)
     .eq('status', 'draft');
 
   if (error) {
@@ -226,7 +238,9 @@ export async function activateCampaign(landingId: string) {
     return { error: 'No se pudo activar la campaña.' };
   }
 
+  await supabase.from('landings').update({ is_active: true }).eq('id', campana.landing_id);
+
   revalidatePath('/admin/campaigns');
   revalidatePath('/admin/landings');
-  redirect('/admin/landings');
+  redirect('/admin/campaigns');
 }

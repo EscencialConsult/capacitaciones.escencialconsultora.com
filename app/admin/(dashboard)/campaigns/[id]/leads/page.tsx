@@ -33,42 +33,59 @@ const etiquetaEtapa: Record<string, string> = {
 
 type EmailSend = { status: string; scheduled_for: string; landing_email_step_id: string };
 
-export default async function LandingLeadsPage({ params }: { params: { id: string } }) {
+// Leads viven acá (por campaña), no en Landings — una landing es solo
+// el link, la campaña es la que capturó los leads. Ver
+// supabase/migrations/0004_separar_campanas_de_landings.sql.
+export default async function CampaignLeadsPage({ params }: { params: { id: string } }) {
   const supabase = createSupabaseServiceClient();
 
-  const [{ data: landing }, { data: pasos }, { data: leads }] = await Promise.all([
+  const [{ data: campana }, { data: pasos }, { data: leads }] = await Promise.all([
     supabase
-      .from('landings')
-      .select('id, name, slug, landing_templates(name)')
+      .from('campaigns')
+      .select('id, name, status, landings(name, slug, landing_templates(name))')
       .eq('id', params.id)
       .single(),
     supabase
       .from('landing_email_steps')
       .select('id, step_number, subject')
-      .eq('landing_id', params.id)
+      .eq('campaign_id', params.id)
       .order('step_number', { ascending: true }),
     supabase
       .from('leads')
       .select(
         'id, first_name, last_name, email, phone, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(status, scheduled_for, landing_email_step_id)'
       )
-      .eq('landing_id', params.id)
+      .eq('campaign_id', params.id)
       .order('created_at', { ascending: false }),
   ]);
 
-  const plantilla = landing?.landing_templates as unknown as { name: string } | null;
+  const landing = campana?.landings as unknown as {
+    name: string;
+    slug: string;
+    landing_templates: { name: string } | null;
+  } | null;
   const pasosConfigurados = pasos ?? [];
+  const estaActiva = campana?.status === 'active';
 
   return (
     <div>
-      <Link href="/admin/landings" prefetch={false} className="text-sm text-one-fucsia hover:underline">
-        ← Volver a landings
+      <Link href="/admin/campaigns" prefetch={false} className="text-sm text-one-fucsia hover:underline">
+        ← Volver a campañas
       </Link>
-      <h1 className="mt-2 text-lg font-extrabold text-one-oscuro">
-        Leads — {landing?.name ?? '...'} <span className="text-one-oscuro/40">(/{landing?.slug})</span>
+      <h1 className="mt-2 flex items-center gap-2 text-lg font-extrabold text-one-oscuro">
+        Leads — {campana?.name ?? '...'}
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+            estaActiva ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/50'
+          }`}
+        >
+          ¿Activa? {estaActiva ? 'Sí' : 'No'}
+        </span>
       </h1>
       <p className="mt-1 text-sm text-one-oscuro/60">
-        Plantilla conectada: <span className="font-semibold text-one-oscuro">{plantilla?.name ?? '—'}</span>
+        Landing: <span className="font-semibold text-one-oscuro">{landing ? `/${landing.slug}` : '—'}</span>
+        {' · '}
+        Plantilla: <span className="font-semibold text-one-oscuro">{landing?.landing_templates?.name ?? '—'}</span>
         {' · '}
         {pasosConfigurados.length} {pasosConfigurados.length === 1 ? 'email configurado' : 'emails configurados'}
         {' · '}
@@ -118,7 +135,7 @@ export default async function LandingLeadsPage({ params }: { params: { id: strin
           <tbody>
             {(leads ?? []).map((lead) => {
               const sends = (lead.email_sends as EmailSend[]) ?? [];
-              // Por cada paso CONFIGURADO en la landing (no por cada envío
+              // Por cada paso CONFIGURADO en la campaña (no por cada envío
               // que exista) — así si un lead entró antes de que se agregara
               // un paso nuevo, esa etapa se ve como "no aplica" en vez de
               // faltar en silencio de la fila.
@@ -177,7 +194,7 @@ export default async function LandingLeadsPage({ params }: { params: { id: strin
             {(leads ?? []).length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
-                  Todavía no hay leads en esta landing.
+                  Todavía no hay leads en esta campaña.
                 </td>
               </tr>
             )}

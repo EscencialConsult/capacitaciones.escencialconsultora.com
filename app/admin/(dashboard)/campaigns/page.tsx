@@ -4,17 +4,32 @@ import { ActivateButton } from './ActivateButton';
 
 export const dynamic = 'force-dynamic';
 
-// Acá viven las campañas TODAVÍA sin publicar (status='draft') — se
-// arma acá toda la data (asesora, WhatsApp, los 4 emails, qué diseño
-// usa) antes de que exista un link público. Una vez que se activa, la
-// fila desaparece de esta lista y pasa a /admin/landings.
+const badgeEstado: Record<string, string> = {
+  draft: 'bg-one-oscuro/5 text-one-oscuro/50',
+  active: 'bg-emerald-50 text-emerald-600',
+  paused: 'bg-amber-50 text-amber-600',
+  archived: 'bg-one-oscuro/5 text-one-oscuro/40',
+};
+
+const textoEstado: Record<string, string> = {
+  draft: 'Borrador',
+  active: 'Activa',
+  paused: 'Pausada',
+  archived: 'Archivada',
+};
+
+// Acá viven TODAS las campañas — asesora, WhatsApp, los 4 emails, qué
+// diseño usa, y los leads que capturó. A diferencia del diseño viejo,
+// una campaña NUNCA desaparece de acá por activarse: sigue siendo la
+// misma fila, solo cambia el badge de estado. El link público en sí
+// (el "dónde" vive esta campaña) es la Landing conectada — ver
+// /admin/landings.
 export default async function CampaignsPage() {
   const supabase = createSupabaseServiceClient();
 
   const { data: campanas } = await supabase
-    .from('landings')
-    .select('id, slug, name, landing_templates(name), landing_email_steps(count)')
-    .eq('status', 'draft')
+    .from('campaigns')
+    .select('id, name, status, landings(slug, name, landing_templates(name)), landing_email_steps(count)')
     .order('created_at', { ascending: false });
 
   return (
@@ -23,8 +38,8 @@ export default async function CampaignsPage() {
         <div>
           <h1 className="text-lg font-extrabold text-one-oscuro">Campañas</h1>
           <p className="mt-1 text-sm text-one-oscuro/60">
-            Borradores — todavía sin link público. Armá acá el diseño, la asesora y los emails; cuando
-            esté listo, activala para que se convierta en landing.
+            Asesora, WhatsApp, emails de seguimiento y leads de cada campaña — sin importar si ya
+            está activa o todavía en borrador.
           </p>
         </div>
         <Link
@@ -41,32 +56,55 @@ export default async function CampaignsPage() {
           <thead className="text-left text-one-oscuro/50">
             <tr>
               <th className="px-4 py-3 font-semibold">Nombre</th>
-              <th className="px-4 py-3 font-semibold">Link (a futuro)</th>
+              <th className="px-4 py-3 font-semibold">Landing</th>
               <th className="px-4 py-3 font-semibold">Plantilla</th>
+              <th className="px-4 py-3 font-semibold">Estado</th>
               <th className="px-4 py-3 font-semibold">Emails cargados</th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {(campanas ?? []).map((c) => {
-              const template = c.landing_templates as unknown as { name: string } | null;
+              const landing = c.landings as unknown as {
+                slug: string;
+                name: string;
+                landing_templates: { name: string } | null;
+              } | null;
               const cantidadEmails = (c.landing_email_steps as unknown as { count: number }[])?.[0]?.count ?? 0;
               return (
                 <tr key={c.id} className="border-t border-one-oscuro/5">
                   <td className="px-4 py-3 text-one-oscuro">{c.name}</td>
-                  <td className="px-4 py-3 text-one-oscuro/50">/{c.slug}</td>
-                  <td className="px-4 py-3 text-one-oscuro/60">{template?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-one-oscuro/50">
+                    {landing ? `/${landing.slug}` : '— Sin landing —'}
+                  </td>
+                  <td className="px-4 py-3 text-one-oscuro/60">{landing?.landing_templates?.name ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeEstado[c.status] ?? ''}`}>
+                      {textoEstado[c.status] ?? c.status}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{cantidadEmails}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
+                      {c.status === 'draft' && (
+                        <Link
+                          href={`/admin/campaigns/${c.id}/edit`}
+                          prefetch={false}
+                          className="text-one-fucsia hover:underline"
+                        >
+                          Editar
+                        </Link>
+                      )}
                       <Link
-                        href={`/admin/campaigns/${c.id}/edit`}
+                        href={`/admin/campaigns/${c.id}/leads`}
                         prefetch={false}
                         className="text-one-fucsia hover:underline"
                       >
-                        Editar
+                        Ver leads
                       </Link>
-                      <ActivateButton landingId={c.id} slug={c.slug} />
+                      {c.status === 'draft' && landing && (
+                        <ActivateButton campaignId={c.id} slug={landing.slug} />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -74,8 +112,8 @@ export default async function CampaignsPage() {
             })}
             {(campanas ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-one-oscuro/40">
-                  No hay campañas en borrador. Creá una nueva para arrancar.
+                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
+                  No hay ninguna campaña todavía. Creá una nueva para arrancar.
                 </td>
               </tr>
             )}

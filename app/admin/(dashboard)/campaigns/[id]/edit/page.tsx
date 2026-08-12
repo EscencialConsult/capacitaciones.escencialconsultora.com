@@ -1,60 +1,62 @@
 import { notFound, redirect } from 'next/navigation';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-import { CampaignForm } from '../../CampaignForm';
-import { updateLanding } from '../../actions';
+import { CampaignForm, type LandingConPlantilla } from '../../CampaignForm';
+import { updateCampaign } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EditCampaignPage({ params }: { params: { id: string } }) {
   const supabase = createSupabaseServiceClient();
 
-  const [{ data: landing }, { data: pasos }, { data: templates }, { data: emailTemplates }] =
+  const [{ data: campana }, { data: pasos }, { data: landings }, { data: emailTemplates }, { data: templates }, { data: categorias }] =
     await Promise.all([
       supabase
-        .from('landings')
-        .select('id, slug, name, template_id, status, advisor_name, whatsapp_number, whatsapp_message, variables')
+        .from('campaigns')
+        .select('id, name, landing_id, status, advisor_name, whatsapp_number, whatsapp_message, variables')
         .eq('id', params.id)
         .single(),
       supabase
         .from('landing_email_steps')
         .select('step_number, email_template_id, offset_days, subject, content')
-        .eq('landing_id', params.id)
+        .eq('campaign_id', params.id)
         .order('step_number', { ascending: true }),
       supabase
-        .from('landing_templates')
-        .select('id, name, variables_schema')
-        .eq('is_active', true)
+        .from('landings')
+        .select('id, slug, name, landing_templates(name, variables_schema)')
         .order('name'),
       supabase.from('email_templates').select('id, name').eq('is_active', true).order('name'),
+      supabase.from('landing_templates').select('id, name').eq('is_active', true).order('name'),
+      supabase.from('landing_categories').select('id, name').order('name'),
     ]);
 
-  if (!landing) notFound();
+  if (!campana) notFound();
 
   // Ya se activó — no hay nada que editar acá, la pantalla de esta
-  // landing ahora es la de analytics (/admin/landings), no este form.
-  if (landing.status !== 'draft') {
-    redirect(`/admin/landings/${landing.id}/leads`);
+  // campaña ahora es la de leads/analytics, no este form.
+  if (campana.status !== 'draft') {
+    redirect(`/admin/campaigns/${campana.id}/leads`);
   }
 
-  const accionConId = updateLanding.bind(null, landing.id);
+  const accionConId = updateCampaign.bind(null, campana.id);
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-lg font-extrabold text-one-oscuro">Editar campaña — {landing.name}</h1>
+      <h1 className="text-lg font-extrabold text-one-oscuro">Editar campaña — {campana.name}</h1>
       <CampaignForm
-        templates={templates ?? []}
+        landings={(landings ?? []) as unknown as LandingConPlantilla[]}
         emailTemplates={emailTemplates ?? []}
+        templatesParaNuevaLanding={templates ?? []}
+        categorias={categorias ?? []}
         action={accionConId}
         botonTexto="Guardar cambios"
         botonTextoPendiente="Guardando..."
         valoresIniciales={{
-          slug: landing.slug,
-          name: landing.name,
-          template_id: landing.template_id,
-          advisor_name: landing.advisor_name,
-          whatsapp_number: landing.whatsapp_number,
-          whatsapp_message: landing.whatsapp_message,
-          variables: (landing.variables as Record<string, string> | null) ?? {},
+          name: campana.name,
+          landing_id: campana.landing_id,
+          advisor_name: campana.advisor_name,
+          whatsapp_number: campana.whatsapp_number,
+          whatsapp_message: campana.whatsapp_message,
+          variables: (campana.variables as Record<string, string> | null) ?? {},
           pasos: pasos ?? [],
         }}
       />

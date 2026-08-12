@@ -7,13 +7,13 @@ export default async function AdminHomePage() {
   const supabase = createSupabaseServiceClient();
 
   const [
-    { count: landingsActivas },
+    { count: campanasActivas },
     { count: leadsRecientes },
     { count: enviosConError },
     { count: enviosPendientes },
     { data: ultimosLeads },
   ] = await Promise.all([
-    supabase.from('landings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
@@ -22,13 +22,13 @@ export default async function AdminHomePage() {
     supabase.from('email_sends').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
       .from('leads')
-      .select('id, first_name, last_name, email, created_at, landings(name, slug)')
+      .select('id, first_name, last_name, email, created_at, campaigns(name, landings(slug))')
       .order('created_at', { ascending: false })
       .limit(8),
   ]);
 
   const tarjetas = [
-    { label: 'Landings activas', valor: landingsActivas ?? 0 },
+    { label: 'Campañas activas', valor: campanasActivas ?? 0 },
     { label: 'Leads últimos 7 días', valor: leadsRecientes ?? 0 },
     { label: 'Envíos pendientes', valor: enviosPendientes ?? 0 },
     { label: 'Envíos con error', valor: enviosConError ?? 0, alerta: (enviosConError ?? 0) > 0 },
@@ -76,20 +76,28 @@ export default async function AdminHomePage() {
               <tr>
                 <th className="px-4 py-3 font-semibold">Nombre</th>
                 <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold">Landing</th>
+                <th className="px-4 py-3 font-semibold">Campaña</th>
                 <th className="px-4 py-3 font-semibold">Fecha</th>
               </tr>
             </thead>
             <tbody>
               {(ultimosLeads ?? []).map((lead) => {
-                const landing = lead.landings as unknown as { name: string; slug: string } | null;
+                const campana = lead.campaigns as unknown as {
+                  name: string;
+                  landings: { slug: string } | null;
+                } | null;
                 return (
                   <tr key={lead.id} className="border-t border-one-oscuro/5">
                     <td className="px-4 py-3 text-one-oscuro">
                       {lead.first_name} {lead.last_name}
                     </td>
                     <td className="px-4 py-3 text-one-oscuro/60">{lead.email}</td>
-                    <td className="px-4 py-3 text-one-oscuro/60">{landing?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-one-oscuro/60">
+                      {campana?.name ?? '—'}
+                      {campana?.landings?.slug && (
+                        <span className="text-one-oscuro/40"> (/{campana.landings.slug})</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-one-oscuro/60">
                       {new Date(lead.created_at).toLocaleString('es-AR')}
                     </td>

@@ -29,23 +29,41 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseServiceClient();
 
+  // `landing_id` es el contrato público (el <form> de cada plantilla ya
+  // creada lo manda así, ver {{__landing_id__}}) — pero el lead se
+  // guarda contra la CAMPAÑA activa de esa landing, no contra la
+  // landing directo (ver 0004_separar_campanas_de_landings.sql).
   const { data: landing, error: landingError } = await supabase
     .from('landings')
-    .select('id, status')
+    .select('id, is_active')
     .eq('id', landing_id)
     .single();
 
   if (landingError || !landing) {
     return NextResponse.json({ ok: false, error: 'La landing no existe.' }, { status: 404 });
   }
-  if (landing.status !== 'active') {
+  if (!landing.is_active) {
     return NextResponse.json({ ok: false, error: 'Esta landing no está activa.' }, { status: 409 });
+  }
+
+  const { data: campana, error: campanaError } = await supabase
+    .from('campaigns')
+    .select('id')
+    .eq('landing_id', landing_id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (campanaError || !campana) {
+    return NextResponse.json(
+      { ok: false, error: 'Esta landing no tiene ninguna campaña activa en este momento.' },
+      { status: 409 }
+    );
   }
 
   const { data: lead, error: insertError } = await supabase
     .from('leads')
     .insert({
-      landing_id,
+      campaign_id: campana.id,
       email,
       first_name: nombre,
       last_name: apellido,
@@ -55,7 +73,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
-    // Constraint unique(landing_id, lower(email)) -> ya estaba registrado.
+    // Constraint unique(campaign_id, lower(email)) -> ya estaba registrado.
     // Código 23505 = unique_violation en Postgres.
     if (insertError.code === '23505') {
       return NextResponse.json({ ok: true, duplicado: true });
@@ -64,14 +82,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'No se pudo guardar el lead.' }, { status: 500 });
   }
 
-  // Agenda los envíos según los pasos activos configurados para esta landing.
+  // Agenda los envíos según los pasos activos configurados para esta campaña.
   // El cálculo se hace UNA sola vez acá, tomando como base el momento de
   // captura — igual que en el sistema viejo, el lead arrastra su propio
-  // calendario para siempre sin importar qué cambie después en la landing.
+  // calendario para siempre sin importar qué cambie después en la campaña.
   const { data: steps, error: stepsError } = await supabase
     .from('landing_email_steps')
     .select('id, offset_days')
-    .eq('landing_id', landing_id)
+    .eq('campaign_id', campana.id)
     .eq('is_active', true);
 
   if (stepsError) {

@@ -4,10 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { NewEmailTemplateModal } from './NewEmailTemplateModal';
+import { NewLandingModal } from './NewLandingModal';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
 type VariableSchema = { key: string; label: string; type: 'text' | 'textarea'; description?: string };
-type Plantilla = { id: string; name: string; variables_schema: VariableSchema[] | null };
+export type LandingConPlantilla = {
+  id: string;
+  slug: string;
+  name: string;
+  landing_templates: { name: string; variables_schema: VariableSchema[] | null } | null;
+};
 type EmailPlantilla = { id: string; name: string };
 type Accion = (
   prevState: { error?: string } | undefined,
@@ -23,9 +29,8 @@ type PasoExistente = {
 };
 
 type ValoresIniciales = {
-  slug: string;
   name: string;
-  template_id: string;
+  landing_id: string;
   advisor_name: string | null;
   whatsapp_number: string | null;
   whatsapp_message: string | null;
@@ -137,22 +142,28 @@ function BloqueEmail({
   );
 }
 
-// Formulario único de "campaña" (borrador, todavía sin link público) —
-// sirve para crear y editar: en modo edición se le pasa `valoresIniciales`
-// con la landing + sus pasos ya cargados. El campo "Estado" no existe acá
-// a propósito: toda campaña nueva arranca en borrador siempre, y pasar a
-// "landing activa" es una acción aparte (botón "Activar" en la lista de
-// Campañas), no un valor más de este form — ver campaigns/actions.ts.
+// Formulario único de "campaña" (contenido de marketing: asesora,
+// WhatsApp, variables, emails, leads) — SIEMPRE conectada a una Landing
+// existente (el link público en sí, ver landings/). Sirve para crear y
+// editar: en modo edición se le pasa `valoresIniciales` con la campaña
+// + sus pasos ya cargados. El campo "Estado" no existe acá a propósito:
+// toda campaña nueva arranca en borrador siempre, y pasar a "activa" es
+// una acción aparte (botón "Activar" en la lista de Campañas) — ver
+// campaigns/actions.ts.
 export function CampaignForm({
-  templates,
+  landings,
   emailTemplates,
+  templatesParaNuevaLanding,
+  categorias,
   action,
   botonTexto,
   botonTextoPendiente,
   valoresIniciales,
 }: {
-  templates: Plantilla[];
+  landings: LandingConPlantilla[];
   emailTemplates: EmailPlantilla[];
+  templatesParaNuevaLanding: { id: string; name: string }[];
+  categorias: { id: string; name: string }[];
   action: Accion;
   botonTexto: string;
   botonTextoPendiente: string;
@@ -183,21 +194,26 @@ export function CampaignForm({
     setPorSeleccionar(null);
   }, [porSeleccionar, listaEmailTemplates]);
 
-  // La plantilla elegida decide qué campos de variables se muestran acá
-  // abajo — cada plantilla declara las suyas sola (ver
+  // La landing elegida decide qué campos de variables se muestran acá
+  // abajo — cada plantilla (de la landing) declara las suyas sola (ver
   // extraerVariablesDeHtml), así que este form no tiene ninguna lista
-  // fija de variables hardcodeada.
-  const [templateId, setTemplateId] = useState(valoresIniciales?.template_id ?? templates[0]?.id ?? '');
+  // fija de variables hardcodeada. El <select> es controlado (a
+  // diferencia de los de diseño de email arriba), así que agregar una
+  // landing nueva a la lista y dejarla elegida es un solo setState —
+  // no hace falta el hack de useEffect diferido para este caso.
+  const [listaLandings, setListaLandings] = useState(landings);
+  const [landingId, setLandingId] = useState(valoresIniciales?.landing_id ?? listaLandings[0]?.id ?? '');
+  const [modalLandingAbierto, setModalLandingAbierto] = useState(false);
   const variablesDeLaPlantilla = useMemo(
-    () => templates.find((t) => t.id === templateId)?.variables_schema ?? [],
-    [templates, templateId]
+    () => listaLandings.find((l) => l.id === landingId)?.landing_templates?.variables_schema ?? [],
+    [listaLandings, landingId]
   );
 
   // Completar a mano campo por campo no es viable en plantillas ricas
   // (hero + beneficios + planes + FAQ pueden ser 40-60 variables), y
   // separar "un JSON para las variables" de "el resto a mano" resultó
   // incómodo en la práctica — este cuadro ahora toma el JSON único que
-  // devuelve el prompt (ver armarPromptCampanaNueva: slug, asesora,
+  // devuelve el prompt (ver armarPromptCampanaNueva: nombre, asesora,
   // whatsapp, emails Y variables juntos) y completa TODO el formulario
   // de una. Pisa el valor de cada <input>/<textarea> directo en el DOM
   // por su id — son campos no controlados, no pelea con React, y lo que
@@ -232,17 +248,29 @@ export function CampaignForm({
       }
     };
 
-    setValor('slug', d.slug);
     setValor('name', d.name);
     setValor('advisor_name', d.advisor_name);
     setValor('whatsapp_number', d.whatsapp_number);
     setValor('whatsapp_message', d.whatsapp_message);
 
+    // Si el JSON viene de un prompt viejo (por ejemplo, un chat de IA que
+    // arrancó antes de cambiar de landing, o que se armó con menos
+    // variables de las que esta plantilla tiene hoy), "vars[v.key]" da
+    // undefined para esa clave y setValor no la toca — el campo queda
+    // vacío en el form SIN que nada avise. faltantes junta esos casos
+    // para poder mostrarlos explícitamente en vez de dejarlos pasar
+    // silenciosos (ver mensaje de abajo).
+    const faltantes: string[] = [];
     if (d.variables && typeof d.variables === 'object' && !Array.isArray(d.variables)) {
       const vars = d.variables as Record<string, unknown>;
       for (const v of variablesDeLaPlantilla) {
+        if (vars[v.key] === undefined || vars[v.key] === null || vars[v.key] === '') {
+          faltantes.push(v.label);
+        }
         setValor(`var_${v.key}`, vars[v.key]);
       }
+    } else if (variablesDeLaPlantilla.length > 0) {
+      faltantes.push(...variablesDeLaPlantilla.map((v) => v.label));
     }
 
     if (Array.isArray(d.emails)) {
@@ -257,23 +285,91 @@ export function CampaignForm({
       }
     }
 
-    setMensajeJson(
-      completados > 0
-        ? {
-            tipo: 'ok',
-            texto: `Completé ${completados} campos. Revisá todo (incluido qué diseño de email elegís para cada paso) antes de guardar.`,
-          }
-        : { tipo: 'error', texto: 'No encontré ningún campo que coincida con este JSON.' }
-    );
+    if (completados === 0) {
+      setMensajeJson({ tipo: 'error', texto: 'No encontré ningún campo que coincida con este JSON.' });
+      return;
+    }
+
+    const nombreLanding = listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla';
+    if (faltantes.length > 0) {
+      // Esto es justo lo que pasó cuando el JSON pegado venía de un
+      // prompt desactualizado: la IA devolvió solo 3 variables (titulo,
+      // subtitulo, boton_texto) para una plantilla que tiene 59 — el
+      // form se completaba "bien" a los ojos del mensaje viejo (que solo
+      // contaba campos) sin avisar que faltaba casi todo el contenido.
+      const primeras = faltantes.slice(0, 8).join(', ');
+      const resto = faltantes.length > 8 ? ` y ${faltantes.length - 8} más` : '';
+      setMensajeJson({
+        tipo: 'error',
+        texto: `Completé ${completados} campos, pero este JSON no trae ${faltantes.length} variable(s) de "${nombreLanding}": ${primeras}${resto}. Probablemente copiaste el prompt antes de elegir esta landing, o desde un chat de IA viejo — copiá el prompt de nuevo (botón de arriba) con esta landing ya elegida y volvé a pedírselo a la IA.`,
+      });
+      return;
+    }
+
+    setMensajeJson({
+      tipo: 'ok',
+      texto: `Completé ${completados} campos, con las ${variablesDeLaPlantilla.length} variables de "${nombreLanding}" incluidas. Revisá todo (incluido qué diseño de email elegís para cada paso) antes de guardar.`,
+    });
   }
 
   return (
     <>
     <form action={formAction} className="mt-6 space-y-6">
+      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+        <h2 className="text-sm font-bold text-one-oscuro">1. Elegí la landing</h2>
+        <p className="mt-1 text-xs text-one-oscuro/40">
+          El prompt del paso 2 depende de esta elección — cambia según qué variables tenga la
+          plantilla de esa landing. Si cambiás de landing acá, volvé a copiar el prompt.
+        </p>
+        <div className="mt-4">
+          <div className="flex items-center justify-between">
+            <label className={labelClass} htmlFor="landing_id">
+              Landing (link público)
+            </label>
+            <button
+              type="button"
+              onClick={() => setModalLandingAbierto(true)}
+              className="text-xs text-one-fucsia hover:underline"
+            >
+              + Crear landing nueva
+            </button>
+          </div>
+          <select
+            id="landing_id"
+            name="landing_id"
+            required
+            value={landingId}
+            onChange={(e) => setLandingId(e.target.value)}
+            className={inputClass}
+          >
+            {!landingId && <option value="">Elegí una landing</option>}
+            {listaLandings.map((l) => (
+              <option key={l.id} value={l.id}>
+                /{l.slug} — {l.name} — {l.landing_templates?.name ?? '—'}
+              </option>
+            ))}
+          </select>
+          {listaLandings.length === 0 && (
+            <p className="mt-1 text-xs text-one-dorado">
+              Todavía no hay ninguna landing creada — usá el botón de arriba para crear la primera.
+            </p>
+          )}
+        </div>
+      </section>
+
       <div className="rounded-one-lg border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-5">
-        <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-one-oscuro">
+          2. Copiá el prompt, pegalo en tu IA, y pegá acá lo que te devuelva
+        </h2>
+        <p className="mt-1 text-xs text-one-oscuro/40">
+          El prompt ya trae las {variablesDeLaPlantilla.length} variable(s) de "
+          {listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla elegida'}
+          " — la IA te va a devolver un JSON con todas esas claves completas. Pegalo abajo y
+          "Completar formulario" enchufa todo de una (opcional, también podés cargar todo a mano).
+        </p>
+        <div className="mt-3 flex items-center justify-between">
           <label className={labelClass} htmlFor="json_campana">
-            Pegar JSON generado por la IA (opcional, completa todo el formulario de una)
+            JSON generado por la IA
           </label>
           <CopyLandingPromptButton variables={variablesDeLaPlantilla} />
         </div>
@@ -282,7 +378,7 @@ export function CampaignForm({
           rows={4}
           value={jsonPegado}
           onChange={(e) => setJsonPegado(e.target.value)}
-          placeholder={'{\n  "slug": "...",\n  "advisor_name": "...",\n  "variables": { "titulo": "..." },\n  "emails": [{ "step": 1, "offset_days": 0, "subject": "...", "content": "..." }]\n}'}
+          placeholder={'{\n  "name": "...",\n  "advisor_name": "...",\n  "variables": { "titulo": "..." },\n  "emails": [{ "step": 1, "offset_days": 0, "subject": "...", "content": "..." }]\n}'}
           className={`${inputClass} font-mono text-xs`}
         />
         <div className="mt-2 flex items-center gap-3">
@@ -302,18 +398,9 @@ export function CampaignForm({
       </div>
 
       <section className="rounded-one-lg bg-one-oscuro/5 p-5">
-        <h2 className="text-sm font-bold text-one-oscuro">Datos generales</h2>
+        <h2 className="text-sm font-bold text-one-oscuro">3. Revisá y ajustá</h2>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormInput
-            id="slug"
-            name="slug"
-            label="Link (slug)"
-            placeholder="liquidacion-ago26"
-            required
-            defaultValue={valoresIniciales?.slug}
-            hint="Va a quedar en capacitaciones.escencialconsultora.com/liquidacion-ago26 — recién existe de verdad cuando actives la campaña."
-          />
           <FormInput
             id="name"
             name="name"
@@ -322,35 +409,14 @@ export function CampaignForm({
             required
             defaultValue={valoresIniciales?.name}
           />
-
-          <div>
-            <label className={labelClass} htmlFor="template_id">
-              Plantilla de landing (diseño)
-            </label>
-            <select
-              id="template_id"
-              name="template_id"
-              required
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-              className={inputClass}
-            >
-              {!templateId && <option value="">Elegí un diseño</option>}
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {variablesDeLaPlantilla.length === 0 && (
             <p className="text-xs text-one-oscuro/40 sm:col-span-2">
-              {templateId
-                ? 'Esta plantilla no tiene ningún {{clave}} en su HTML — no hay texto editable por campaña.'
-                : 'Elegí una plantilla arriba para ver qué campos de texto tiene.'}
+              {landingId
+                ? 'La plantilla de esta landing no tiene ningún {{clave}} en su HTML — no hay texto editable por campaña.'
+                : 'Elegí una landing arriba para ver qué campos de texto tiene su plantilla.'}
             </p>
           )}
           {variablesDeLaPlantilla.map((v) =>
@@ -441,9 +507,9 @@ export function CampaignForm({
       <BotonGuardar texto={botonTexto} textoPendiente={botonTextoPendiente} />
     </form>
 
-    {/* Fuera del <form> a propósito: el modal tiene su propio <form> para
-        crear el diseño, y un <form> no puede anidar otro <form> — eso
-        rompía la hidratación de React. */}
+    {/* Ambos modales quedan fuera del <form> de campaña a propósito:
+        cada uno tiene su propio <form> para crear, y un <form> no puede
+        anidar otro <form> — eso rompía la hidratación de React. */}
     {pasoModalDiseno && (
       <NewEmailTemplateModal
         onClose={() => setPasoModalDiseno(null)}
@@ -451,6 +517,18 @@ export function CampaignForm({
           setListaEmailTemplates((prev) => [...prev, plantilla]);
           setPorSeleccionar({ numero: pasoModalDiseno, templateId: plantilla.id });
           setPasoModalDiseno(null);
+        }}
+      />
+    )}
+    {modalLandingAbierto && (
+      <NewLandingModal
+        onClose={() => setModalLandingAbierto(false)}
+        templates={templatesParaNuevaLanding}
+        categorias={categorias}
+        onCreated={(landing) => {
+          setListaLandings((prev) => [...prev, landing]);
+          setLandingId(landing.id);
+          setModalLandingAbierto(false);
         }}
       />
     )}
