@@ -127,10 +127,18 @@ export async function createCampaign(_prevState: { error?: string } | undefined,
 }
 
 /**
- * Solo se puede editar una campaña mientras sigue en 'draft' — una vez
- * activada, el contenido queda fijo y la pantalla de esa campaña pasa a
- * ser de analytics/leads, no de edición (ver campaigns/[id]/leads). El
- * chequeo se repite acá server-side, no solo ocultando el link en la UI.
+ * Se puede editar una campaña en cualquier estado — activa, pausada,
+ * lo que sea. Ya no hace falta pasar por "borrador" para corregir un
+ * dato (antes quedaba todo fijo apenas se activaba). Los pasos de
+ * email se actualizan en el lugar (upsert por campaign_id+step_number,
+ * NUNCA delete-then-insert) para no romper la referencia de
+ * email_sends.landing_email_step_id — si una campaña activa ya le
+ * mandó un email real a algún lead por el paso 2, esa fila de
+ * landing_email_steps tiene que seguir existiendo con el mismo id.
+ * Solo se borra un paso si quedó vacío en el form Y nadie recibió
+ * todavía un envío de ese paso puntual (si alguien ya lo recibió, el
+ * borrado falla por la FK a propósito — ver el catch de 23503 abajo —
+ * en vez de perder en silencio el historial de un envío ya hecho).
  */
 export async function updateCampaign(
   campaignId: string,
@@ -147,11 +155,6 @@ export async function updateCampaign(
   const pasos = parsePasos(d);
 
   const supabase = createSupabaseServiceClient();
-
-  const { data: actual } = await supabase.from('campaigns').select('status').eq('id', campaignId).single();
-  if (!actual || actual.status !== 'draft') {
-    return { error: 'Esta campaña ya está activa — el contenido no se puede editar más desde acá.' };
-  }
 
   const { error: campanaError } = await supabase
     .from('campaigns')
@@ -171,11 +174,7 @@ export async function updateCampaign(
     return { error: 'No se pudo guardar la campaña.' };
   }
 
-  // Se reemplazan todos los pasos — más simple y seguro que tratar de
-  // diffear altas/bajas/cambios paso por paso, y de todos modos ningún
-  // email_send pudo haberse generado todavía (la campaña ni es 'active').
-  await supabase.from('landing_email_steps').delete().eq('campaign_id', campaignId);
-  const { error: stepError } = await supabase.from('landing_email_steps').insert(
+  const { error: upsertError } = await supabase.from('landing_email_steps').upsert(
     pasos.map((p) => ({
       campaign_id: campaignId,
       step_number: p.n,
@@ -183,11 +182,32 @@ export async function updateCampaign(
       offset_days: p.offset_days,
       subject: p.subject,
       content: p.content,
-    }))
+    })),
+    { onConflict: 'campaign_id,step_number' }
   );
 
-  if (stepError) {
-    console.error('Error actualizando landing_email_steps:', stepError);
+  if (upsertError) {
+    console.error('Error actualizando landing_email_steps:', upsertError);
+    return { error: 'Se guardaron los datos generales, pero falló algún paso de email.' };
+  }
+
+  // Pasos que existían antes pero quedaron vacíos en este guardado
+  // (el usuario borró el asunto/contenido del email 3, por ejemplo).
+  const numerosActuales = pasos.map((p) => p.n);
+  const { error: deleteError } = await supabase
+    .from('landing_email_steps')
+    .delete()
+    .eq('campaign_id', campaignId)
+    .not('step_number', 'in', `(${numerosActuales.join(',')})`);
+
+  if (deleteError) {
+    if (deleteError.code === '23503') {
+      return {
+        error:
+          'Se guardó todo lo demás, pero no pude vaciar un paso de email que ya se le mandó a algún lead — dejalo con contenido en vez de borrarlo.',
+      };
+    }
+    console.error('Error borrando pasos de email sobrantes:', deleteError);
     return { error: 'Se guardaron los datos generales, pero falló algún paso de email.' };
   }
 
