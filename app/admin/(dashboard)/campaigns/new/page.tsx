@@ -8,7 +8,11 @@ export default async function NewCampaignPage() {
   const supabase = createSupabaseServiceClient();
 
   const [{ data: templates }, { data: emailTemplates }] = await Promise.all([
-    supabase.from('landing_templates').select('id, name').eq('is_active', true).order('name'),
+    supabase
+      .from('landing_templates')
+      .select('id, name, variables_schema')
+      .eq('is_active', true)
+      .order('name'),
     supabase.from('email_templates').select('id, name').eq('is_active', true).order('name'),
   ]);
 

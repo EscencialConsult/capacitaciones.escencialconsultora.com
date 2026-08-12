@@ -1,15 +1,49 @@
+export type VariableSchema = { key: string; label: string; type: 'text' | 'textarea' };
+
+// Labels prolijas para las variables de siempre — cualquier otra clave
+// nueva que aparezca en el HTML se etiqueta automáticamente a partir de
+// su nombre (ver etiquetaDesdeClave), sin que haga falta mantener esta
+// lista al día para cada plantilla nueva.
+const ETIQUETAS_CONOCIDAS: Record<string, string> = {
+  titulo: 'Título principal',
+  subtitulo: 'Subtítulo',
+  boton_texto: 'Texto del botón',
+};
+
+// Si la clave sugiere contenido largo (un párrafo, una descripción),
+// se le asigna textarea en vez de un input de una sola línea — pura
+// comodidad de carga, no cambia en nada cómo se guarda el dato.
+const PISTAS_TEXTO_LARGO = ['contenido', 'descripcion', 'texto', 'bajada', 'parrafo', 'detalle'];
+
+function etiquetaDesdeClave(key: string): string {
+  const frase = key.split('_').filter(Boolean).join(' ');
+  return frase.charAt(0).toUpperCase() + frase.slice(1);
+}
+
 /**
- * Las 3 variables (titulo, subtitulo, boton_texto) son fijas para TODAS
- * las plantillas de landing, siguiendo el mismo esquema del sistema
- * viejo (index.html original) — nunca cambian, así que se usan como
- * default en vez de arrancar con un JSON vacío que haya que escribir
- * a mano cada vez.
+ * Reemplazo de VARIABLES_SCHEMA_FIJO: en vez de forzar siempre las
+ * mismas 3 variables (titulo/subtitulo/boton_texto), se detectan solas
+ * a partir del HTML que se pega en la plantilla — cualquier {{clave}}
+ * que aparezca se vuelve un campo del formulario de campaña, sin
+ * necesidad de una interfaz de JSON a mano (eso ya se probó y no
+ * funcionó bien acá). El reservado {{__landing_id__}} nunca se cuenta,
+ * lo inyecta el sistema siempre, no es algo que se cargue por campaña.
  */
-export const VARIABLES_SCHEMA_FIJO = [
-  { key: 'titulo', label: 'Título principal', type: 'text' },
-  { key: 'subtitulo', label: 'Subtítulo', type: 'text' },
-  { key: 'boton_texto', label: 'Texto del botón', type: 'text' },
-];
+export function extraerVariablesDeHtml(html: string): VariableSchema[] {
+  const encontradas = new Set<string>();
+  const regex = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html))) {
+    const clave = match[1];
+    if (clave === '__landing_id__') continue;
+    encontradas.add(clave);
+  }
+  return Array.from(encontradas).map((key) => ({
+    key,
+    label: ETIQUETAS_CONOCIDAS[key] ?? etiquetaDesdeClave(key),
+    type: PISTAS_TEXTO_LARGO.some((pista) => key.includes(pista)) ? 'textarea' : 'text',
+  }));
+}
 
 /**
  * SOLO la parte funcional (los campos que se envían y el JS que los
@@ -107,8 +141,20 @@ export const HTML_BASE = `<!DOCTYPE html>
  * lugares del panel en vez de un archivo y una fila: la plantilla
  * (el HTML) va en /admin/templates/new, y el resto de los datos
  * (asesora, WhatsApp, contenido de los emails) va en
- * /admin/landings/new, donde esa landing se conecta a la plantilla que
+ * /admin/campaigns/new, donde esa campaña se conecta a la plantilla que
  * acabás de subir.
+ *
+ * IMPORTANTE (2026-08-12): sin Tailwind por CDN — Tailwind mismo
+ * desaconseja el script del CDN para producción (manda el compilador
+ * JIT completo al navegador de cada visitante, más lento justo en la
+ * página que más importa que cargue rápido). El diseño sigue siendo
+ * 100% libre vía <style>, no hace falta el framework para lograrlo.
+ * Las variables además de titulo/subtitulo/boton_texto (precios,
+ * módulos, testimonios, lo que haga falta) ya NO necesitan declararse
+ * aparte en el resumen — el sistema las detecta solo a partir de
+ * cualquier {{clave}} que aparezca en el HTML (ver
+ * extraerVariablesDeHtml más arriba) y arma el campo correspondiente en
+ * el formulario de campaña automáticamente.
  */
 export function armarPromptCampanaNueva() {
   return `Necesito armar una landing nueva para mi plataforma. Antes de generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a cada una:
@@ -122,13 +168,18 @@ export function armarPromptCampanaNueva() {
    - Asunto del email.
    - Contenido/speech de ese paso puntual.
 
-4. Título, subtítulo y texto del botón que va a mostrar la landing.
+4. Título, subtítulo y texto del botón principal de la landing. Después contame si querés secciones de contenido adicionales (por ejemplo: beneficios/módulos, planes de precio, testimonios, preguntas frecuentes) — para cada una que quieras, decime el contenido real (nunca inventes vos el contenido de negocio, eso lo doy yo).
 
-5. Por último, pedime el estilo/diseño visual que querés (colores, referencia de marca, humor de la campaña). Si no tengo nada específico, decime que uses cualquier estilo prolijo.
+5. Por último, pedime el estilo/diseño visual que querés (colores, referencia de marca, humor de la campaña, alguna landing existente que te guste como referencia). Si no tengo nada específico, decime que uses cualquier estilo prolijo y moderno.
 
 Con esas respuestas, generame DOS cosas:
 
-A) El HTML completo de la landing. Partí EXACTAMENTE del HTML base de acá abajo — es la parte funcional real, ya probada (el formulario y el script que mandan los datos). NO toques los inputs, sus atributos "name", el input oculto "landing_id", ni el bloque <script>. Lo único que agregás es el diseño visual completo alrededor (agregá el <style>, reorganizá el <body> como quieras) según el punto 5, y dejá los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} tal cual, sin texto fijo reemplazándolos.
+A) El HTML completo de la landing. Partí EXACTAMENTE del HTML base de acá abajo — es la parte funcional real, ya probada (el formulario y el script que mandan los datos). NO toques los inputs, sus atributos "name", el input oculto "landing_id", ni el bloque <script>. Lo único que agregás es el diseño visual completo alrededor:
+   - Meté todo el estilo en una etiqueta <style> propia, escrito a mano (CSS normal) — NADA de Tailwind por CDN ni ningún framework externo de CSS/JS: la landing tiene que cargar rápido para el lead que recién llega, y un compilador de estilos corriendo en el navegador del visitante va exactamente en contra de eso.
+   - Si necesitás una tipografía distinta a la del sistema, podés importarla de Google Fonts en el <head> (con display=swap para que no haya parpadeo de texto invisible mientras carga).
+   - Íconos: SVG inline si hacen falta, nunca una librería de íconos externa.
+   - Reorganizá el <body> como quieras — hero con el formulario, secciones de beneficios/precios/testimonios si las pediste en el punto 4, footer con los datos de la asesora, lo que corresponda al diseño.
+   - Dejá los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} tal cual, sin texto fijo reemplazándolos. Si agregaste secciones nuevas con contenido variable (precios, módulos, etc.), usá también placeholders {{clave_que_elijas}} para esas partes en vez de escribir el texto fijo — el sistema los detecta solo, no hace falta declararlos en ningún lado aparte, solo que aparezcan en el HTML.
 
 B) Un resumen con el resto de los datos, en este formato exacto:
 
@@ -154,5 +205,5 @@ ${HTML_BASE}
 
 Cuando termines, dame primero el HTML completo (A), y después el resumen (B) — nada de explicaciones extra en el medio.
 
-Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel; el resumen (B) lo uso para crear la landing y conectarla a esa plantilla.`;
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel — el sistema detecta solo cada {{variable}} que uses y arma su campo correspondiente; el resumen (B) lo uso para crear la campaña y conectarla a esa plantilla, completando ahí también las variables extra que hayas agregado.`;
 }

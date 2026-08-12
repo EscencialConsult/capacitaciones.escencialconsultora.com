@@ -20,7 +20,11 @@ export default async function EditCampaignPage({ params }: { params: { id: strin
         .select('step_number, email_template_id, offset_days, subject, content')
         .eq('landing_id', params.id)
         .order('step_number', { ascending: true }),
-      supabase.from('landing_templates').select('id, name').eq('is_active', true).order('name'),
+      supabase
+        .from('landing_templates')
+        .select('id, name, variables_schema')
+        .eq('is_active', true)
+        .order('name'),
       supabase.from('email_templates').select('id, name').eq('is_active', true).order('name'),
     ]);
 
@@ -50,7 +54,7 @@ export default async function EditCampaignPage({ params }: { params: { id: strin
           advisor_name: landing.advisor_name,
           whatsapp_number: landing.whatsapp_number,
           whatsapp_message: landing.whatsapp_message,
-          variables: landing.variables as { titulo?: string; subtitulo?: string; boton_texto?: string } | null,
+          variables: (landing.variables as Record<string, string> | null) ?? {},
           pasos: pasos ?? [],
         }}
       />

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-import { VARIABLES_SCHEMA_FIJO } from '@/lib/landing-template-defaults';
+import { extraerVariablesDeHtml } from '@/lib/landing-template-defaults';
 
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
@@ -14,10 +14,11 @@ const templateSchema = z.object({
 });
 
 /**
- * Las variables (titulo, subtitulo, boton_texto) son siempre las mismas
- * 3 — no dependen de lo que se tipee en el formulario, se fijan acá
- * directo en el código. Así no hace falta mostrar un campo JSON editable
- * en la interfaz para algo que en la práctica nunca cambia.
+ * Las variables NO se tipean a mano en ningún campo — se detectan solas
+ * a partir de cada {{clave}} que aparezca en el HTML pegado (ver
+ * extraerVariablesDeHtml). Así una plantilla nueva con {{precio_plan_1}}
+ * o cualquier variable propia queda disponible en el formulario de
+ * campaña sin tocar código ni mostrar una interfaz de JSON en el panel.
  */
 function parseTemplateForm(formData: FormData) {
   const raw = Object.fromEntries(formData) as Record<string, string>;
@@ -31,7 +32,7 @@ function parseTemplateForm(formData: FormData) {
       name: parsed.data.name,
       category_id: parsed.data.category_id || null,
       html_content: parsed.data.html_content,
-      variables_schema: VARIABLES_SCHEMA_FIJO,
+      variables_schema: extraerVariablesDeHtml(parsed.data.html_content),
       is_active: parsed.data.is_active === 'true',
     },
   } as const;

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { NewCategoryModal } from './NewCategoryModal';
 import { CopyPromptButton } from './CopyPromptButton';
-import { HTML_BASE } from '@/lib/landing-template-defaults';
+import { HTML_BASE, extraerVariablesDeHtml } from '@/lib/landing-template-defaults';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
 type Categoria = { id: string; name: string };
@@ -42,6 +42,7 @@ export function TemplateForm({
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const [html, setHtml] = useState(valoresIniciales?.html_content ?? HTML_BASE);
+  const variablesDetectadas = useMemo(() => extraerVariablesDeHtml(html), [html]);
   const [listaCategorias, setListaCategorias] = useState(categorias);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -129,13 +130,37 @@ export function TemplateForm({
             className={`${inputClass} font-mono text-xs`}
           />
           <p className="mt-1 text-xs text-one-oscuro/40">
-            HTML/CSS/JS autocontenido, sin React ni Tailwind — usá {'{{clave}}'} para los placeholders
-            declarados arriba, más el reservado {'{{__landing_id__}}'} en el input oculto del formulario.
-            Ya arranca con la plantilla base del sistema viejo — lo único que tenés que subir/cambiar es
-            el HTML, el resto del funcionamiento (el fetch, el envío) es siempre el mismo. Si querés un
-            diseño distinto, copiá el prompt de arriba y pegáselo a una IA — te va a devolver el HTML
-            completo listo para pegar acá, sin tocar la lógica.
+            HTML/CSS/JS autocontenido, sin React ni Tailwind (ni ningún framework por CDN — la landing
+            tiene que cargar rápido) — usá {'{{clave}}'} para cualquier variable que necesites, más el
+            reservado {'{{__landing_id__}}'} en el input oculto del formulario. Ya arranca con la
+            plantilla base del sistema viejo — lo único que tenés que subir/cambiar es el HTML, el resto
+            del funcionamiento (el fetch, el envío) es siempre el mismo. Si querés un diseño distinto,
+            copiá el prompt de arriba y pegáselo a una IA — te va a devolver el HTML completo listo para
+            pegar acá, sin tocar la lógica.
           </p>
+
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-one-oscuro/60">
+              Variables detectadas en este HTML (aparecen solas, no se declaran a mano):
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {variablesDetectadas.length === 0 && (
+                <span className="text-xs text-one-dorado">
+                  No encontré ningún {'{{clave}}'} en el HTML — la landing no va a tener texto editable
+                  por campaña.
+                </span>
+              )}
+              {variablesDetectadas.map((v) => (
+                <span
+                  key={v.key}
+                  title={v.label}
+                  className="rounded-full bg-one-fucsia/10 px-2.5 py-0.5 text-xs font-medium text-one-fucsia"
+                >
+                  {'{{' + v.key + '}}'}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}

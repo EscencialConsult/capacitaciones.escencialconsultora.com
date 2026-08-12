@@ -1,10 +1,12 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
-type Plantilla = { id: string; name: string };
+type VariableSchema = { key: string; label: string; type: 'text' | 'textarea' };
+type Plantilla = { id: string; name: string; variables_schema: VariableSchema[] | null };
 type EmailPlantilla = { id: string; name: string };
 type Accion = (
   prevState: { error?: string } | undefined,
@@ -26,7 +28,7 @@ type ValoresIniciales = {
   advisor_name: string | null;
   whatsapp_number: string | null;
   whatsapp_message: string | null;
-  variables: { titulo?: string; subtitulo?: string; boton_texto?: string } | null;
+  variables: Record<string, string>;
   pasos: PasoExistente[];
 };
 
@@ -145,6 +147,16 @@ export function CampaignForm({
   const [state, formAction] = useFormState(action, undefined);
   const pasoPorNumero = (n: number) => valoresIniciales?.pasos.find((p) => p.step_number === n);
 
+  // La plantilla elegida decide qué campos de variables se muestran acá
+  // abajo — cada plantilla declara las suyas sola (ver
+  // extraerVariablesDeHtml), así que este form no tiene ninguna lista
+  // fija de variables hardcodeada.
+  const [templateId, setTemplateId] = useState(valoresIniciales?.template_id ?? templates[0]?.id ?? '');
+  const variablesDeLaPlantilla = useMemo(
+    () => templates.find((t) => t.id === templateId)?.variables_schema ?? [],
+    [templates, templateId]
+  );
+
   return (
     <form action={formAction} className="mt-6 space-y-6">
       <section className="rounded-one-lg bg-one-oscuro/5 p-5">
@@ -180,10 +192,11 @@ export function CampaignForm({
               id="template_id"
               name="template_id"
               required
-              defaultValue={valoresIniciales?.template_id ?? ''}
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
               className={inputClass}
             >
-              {!valoresIniciales && <option value="">Elegí un diseño</option>}
+              {!templateId && <option value="">Elegí un diseño</option>}
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -193,25 +206,38 @@ export function CampaignForm({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <FormInput
-            id="var_titulo"
-            name="var_titulo"
-            label="Título principal"
-            defaultValue={valoresIniciales?.variables?.titulo}
-          />
-          <FormInput
-            id="var_subtitulo"
-            name="var_subtitulo"
-            label="Subtítulo"
-            defaultValue={valoresIniciales?.variables?.subtitulo}
-          />
-          <FormInput
-            id="var_boton_texto"
-            name="var_boton_texto"
-            label="Texto del botón"
-            defaultValue={valoresIniciales?.variables?.boton_texto ?? 'Enviar'}
-          />
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {variablesDeLaPlantilla.length === 0 && (
+            <p className="text-xs text-one-oscuro/40 sm:col-span-2">
+              {templateId
+                ? 'Esta plantilla no tiene ningún {{clave}} en su HTML — no hay texto editable por campaña.'
+                : 'Elegí una plantilla arriba para ver qué campos de texto tiene.'}
+            </p>
+          )}
+          {variablesDeLaPlantilla.map((v) =>
+            v.type === 'textarea' ? (
+              <div key={v.key} className="sm:col-span-2">
+                <label className={labelClass} htmlFor={`var_${v.key}`}>
+                  {v.label}
+                </label>
+                <textarea
+                  id={`var_${v.key}`}
+                  name={`var_${v.key}`}
+                  rows={3}
+                  defaultValue={valoresIniciales?.variables[v.key]}
+                  className={inputClass}
+                />
+              </div>
+            ) : (
+              <FormInput
+                key={v.key}
+                id={`var_${v.key}`}
+                name={`var_${v.key}`}
+                label={v.label}
+                defaultValue={valoresIniciales?.variables[v.key]}
+              />
+            )
+          )}
         </div>
       </section>
 

@@ -24,9 +24,6 @@ const campaignSchema = z.object({
   // clickear el botón del email — el sistema nunca lo manda solo, ver
   // Script C del sistema viejo / app/api/track/route.ts acá.
   whatsapp_message: z.string().trim().optional().default(''),
-  var_titulo: z.string().trim().optional().default(''),
-  var_subtitulo: z.string().trim().optional().default(''),
-  var_boton_texto: z.string().trim().optional().default('Enviar'),
   // Paso 1 es obligatorio (toda campaña manda al menos un email). Los
   // pasos 2 a 4 son opcionales — se saltean solos si asunto Y contenido
   // quedan vacíos, mismo criterio que template_base_N vacío en el
@@ -48,6 +45,23 @@ const campaignSchema = z.object({
   step4_subject: z.string().trim().optional().default(''),
   step4_content: z.string().trim().optional().default(''),
 });
+
+/**
+ * Las variables de la landing (título, subtítulo, precio, lo que sea)
+ * ya no son un set fijo — se leen directo de cualquier campo `var_*`
+ * que haya en el formulario, sea cual sea la plantilla elegida (esos
+ * campos los arma CampaignForm dinámicamente a partir de
+ * template.variables_schema). Nada que mantener sincronizado acá.
+ */
+function extraerVariables(formData: FormData): Record<string, string> {
+  const variables: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('var_') && typeof value === 'string') {
+      variables[key.slice('var_'.length)] = value;
+    }
+  }
+  return variables;
+}
 
 function parsePasos(d: z.infer<typeof campaignSchema>) {
   return [
@@ -90,7 +104,7 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
       advisor_name: d.advisor_name || null,
       whatsapp_number: d.whatsapp_number || null,
       whatsapp_message: d.whatsapp_message || null,
-      variables: { titulo: d.var_titulo, subtitulo: d.var_subtitulo, boton_texto: d.var_boton_texto },
+      variables: extraerVariables(formData),
     })
     .select('id')
     .single();
@@ -164,7 +178,7 @@ export async function updateLanding(
       advisor_name: d.advisor_name || null,
       whatsapp_number: d.whatsapp_number || null,
       whatsapp_message: d.whatsapp_message || null,
-      variables: { titulo: d.var_titulo, subtitulo: d.var_subtitulo, boton_texto: d.var_boton_texto },
+      variables: extraerVariables(formData),
       updated_at: new Date().toISOString(),
     })
     .eq('id', landingId);
