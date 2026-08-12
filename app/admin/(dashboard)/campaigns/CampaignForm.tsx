@@ -158,51 +158,114 @@ export function CampaignForm({
   );
 
   // Completar a mano campo por campo no es viable en plantillas ricas
-  // (hero + beneficios + planes + FAQ pueden ser 40-60 variables). Este
-  // cuadro toma el bloque JSON que devuelve el prompt (ver
-  // armarPromptCampanaNueva) y pisa el valor de cada <input>/<textarea>
-  // por su id `var_<clave>` directo en el DOM — son campos no
-  // controlados, así que esto no pelea con React, y lo que quede
-  // cargado ahí es lo que se manda al enviar el formulario igual.
+  // (hero + beneficios + planes + FAQ pueden ser 40-60 variables), y
+  // separar "un JSON para las variables" de "el resto a mano" resultó
+  // incómodo en la práctica — este cuadro ahora toma el JSON único que
+  // devuelve el prompt (ver armarPromptCampanaNueva: slug, asesora,
+  // whatsapp, emails Y variables juntos) y completa TODO el formulario
+  // de una. Pisa el valor de cada <input>/<textarea> directo en el DOM
+  // por su id — son campos no controlados, no pelea con React, y lo que
+  // quede cargado ahí es lo que se manda al enviar el formulario igual.
+  // Lo único que NO completa es qué diseño de email usa cada paso (el
+  // <select> de email_template_id) — esa es una elección de diseño, no
+  // de contenido, se sigue eligiendo a mano.
   const [jsonPegado, setJsonPegado] = useState('');
   const [mensajeJson, setMensajeJson] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
   function aplicarJson() {
-    let valores: unknown;
+    let datos: unknown;
     try {
-      valores = JSON.parse(jsonPegado);
+      datos = JSON.parse(jsonPegado);
     } catch {
       setMensajeJson({ tipo: 'error', texto: 'Ese texto no es JSON válido — revisá que empiece con { y termine con }.' });
       return;
     }
-    if (typeof valores !== 'object' || valores === null || Array.isArray(valores)) {
-      setMensajeJson({ tipo: 'error', texto: 'Tiene que ser un objeto {"clave": "valor"}, no una lista ni un texto suelto.' });
+    if (typeof datos !== 'object' || datos === null || Array.isArray(datos)) {
+      setMensajeJson({ tipo: 'error', texto: 'Tiene que ser un objeto { ... }, no una lista ni un texto suelto.' });
       return;
     }
+
     let completados = 0;
-    for (const v of variablesDeLaPlantilla) {
-      const valor = (valores as Record<string, unknown>)[v.key];
-      if (valor === undefined) continue;
-      const el = document.getElementById(`var_${v.key}`) as HTMLInputElement | HTMLTextAreaElement | null;
+    const d = datos as Record<string, unknown>;
+    const setValor = (id: string, valor: unknown) => {
+      if (valor === undefined || valor === null) return;
+      const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
       if (el) {
         el.value = String(valor);
         completados++;
       }
+    };
+
+    setValor('slug', d.slug);
+    setValor('name', d.name);
+    setValor('advisor_name', d.advisor_name);
+    setValor('whatsapp_number', d.whatsapp_number);
+    setValor('whatsapp_message', d.whatsapp_message);
+
+    if (d.variables && typeof d.variables === 'object' && !Array.isArray(d.variables)) {
+      const vars = d.variables as Record<string, unknown>;
+      for (const v of variablesDeLaPlantilla) {
+        setValor(`var_${v.key}`, vars[v.key]);
+      }
     }
+
+    if (Array.isArray(d.emails)) {
+      for (const email of d.emails) {
+        if (typeof email !== 'object' || email === null) continue;
+        const e = email as Record<string, unknown>;
+        const paso = Number(e.step);
+        if (![1, 2, 3, 4].includes(paso)) continue;
+        setValor(`step${paso}_offset_days`, e.offset_days);
+        setValor(`step${paso}_subject`, e.subject);
+        setValor(`step${paso}_content`, e.content);
+      }
+    }
+
     setMensajeJson(
       completados > 0
-        ? { tipo: 'ok', texto: `Completé ${completados} de ${variablesDeLaPlantilla.length} campos. Revisalos antes de guardar.` }
-        : { tipo: 'error', texto: 'No encontré ninguna clave que coincida con los campos de esta plantilla.' }
+        ? {
+            tipo: 'ok',
+            texto: `Completé ${completados} campos. Revisá todo (incluido qué diseño de email elegís para cada paso) antes de guardar.`,
+          }
+        : { tipo: 'error', texto: 'No encontré ningún campo que coincida con este JSON.' }
     );
   }
 
   return (
     <form action={formAction} className="mt-6 space-y-6">
-      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+      <div className="rounded-one-lg border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-one-oscuro">Datos generales</h2>
+          <label className={labelClass} htmlFor="json_campana">
+            Pegar JSON generado por la IA (opcional, completa todo el formulario de una)
+          </label>
           <CopyLandingPromptButton variables={variablesDeLaPlantilla} />
         </div>
+        <textarea
+          id="json_campana"
+          rows={4}
+          value={jsonPegado}
+          onChange={(e) => setJsonPegado(e.target.value)}
+          placeholder={'{\n  "slug": "...",\n  "advisor_name": "...",\n  "variables": { "titulo": "..." },\n  "emails": [{ "step": 1, "offset_days": 0, "subject": "...", "content": "..." }]\n}'}
+          className={`${inputClass} font-mono text-xs`}
+        />
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={aplicarJson}
+            className="rounded-full bg-one-fucsia px-4 py-1.5 text-xs font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
+          >
+            Completar formulario
+          </button>
+          {mensajeJson && (
+            <span className={`text-xs ${mensajeJson.tipo === 'ok' ? 'text-emerald-600' : 'text-one-rojo'}`}>
+              {mensajeJson.texto}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+        <h2 className="text-sm font-bold text-one-oscuro">Datos generales</h2>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormInput
@@ -244,36 +307,6 @@ export function CampaignForm({
             </select>
           </div>
         </div>
-
-        {variablesDeLaPlantilla.length > 0 && (
-          <div className="mt-4 rounded-one-sm border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-4">
-            <label className={labelClass} htmlFor="json_variables">
-              Pegar JSON generado por la IA (opcional, completa los campos de abajo solo)
-            </label>
-            <textarea
-              id="json_variables"
-              rows={3}
-              value={jsonPegado}
-              onChange={(e) => setJsonPegado(e.target.value)}
-              placeholder={'{\n  "titulo": "...",\n  "precio_plan_1": "..."\n}'}
-              className={`${inputClass} font-mono text-xs`}
-            />
-            <div className="mt-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={aplicarJson}
-                className="rounded-full bg-one-fucsia px-4 py-1.5 text-xs font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
-              >
-                Completar campos
-              </button>
-              {mensajeJson && (
-                <span className={`text-xs ${mensajeJson.tipo === 'ok' ? 'text-emerald-600' : 'text-one-rojo'}`}>
-                  {mensajeJson.texto}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {variablesDeLaPlantilla.length === 0 && (

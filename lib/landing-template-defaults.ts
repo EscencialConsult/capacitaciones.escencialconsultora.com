@@ -253,23 +253,27 @@ Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto)
 }
 
 /**
- * El bloque A del resultado sale en JSON (no lista de texto) a
- * propósito: plantillas ricas (hero + beneficios + planes + FAQ...)
- * pueden tener 40-60 variables — completarlas una por una a mano en el
- * formulario no es viable. El panel tiene un cuadro "Pegar JSON" en
- * /admin/campaigns/new que toma este bloque tal cual y completa todos
- * los campos de variables solo (ver CampaignForm.tsx → aplicarJson).
+ * Un solo JSON con TODO (2026-08-12, corregido) — la primera versión
+ * pedía un JSON solo para las variables y el resto en texto plano para
+ * completar a mano; la experiencia real mostró que tiene mucho más
+ * sentido pegar UN SOLO bloque y que complete el formulario entero de
+ * una — slug, asesora, WhatsApp, los 4 emails Y las variables de
+ * contenido. El cuadro "Pegar JSON" de /admin/campaigns/new entiende
+ * esta estructura completa (ver CampaignForm.tsx → aplicarJson). Lo
+ * único que NO viaja acá es el diseño de cada email (qué plantilla de
+ * email usa cada paso) — eso es una elección de diseño, se sigue
+ * completando a mano en el desplegable correspondiente.
  */
 export function armarPromptCampanaNueva(variables: { key: string; label: string; description?: string }[]) {
   const listaVariables = variables.length
     ? variables
         .map((v) => `   - ${v.key} → ${v.label}${v.description ? ` — ${v.description}` : ''}`)
         .join('\n')
-    : '   (esta plantilla no tiene ningún campo de texto propio — no hace falta preguntar nada acá)';
+    : '   (esta plantilla no tiene ningún campo de texto propio)';
 
-  const jsonEjemplo = variables.length
-    ? `{\n${variables.map((v) => `  "${v.key}": "..."`).join(',\n')}\n}`
-    : '(sin variables de contenido en esta plantilla — omití el bloque A)';
+  const jsonVariables = variables.length
+    ? `{\n${variables.map((v) => `      "${v.key}": "..."`).join(',\n')}\n    }`
+    : '{}';
 
   return `Necesito armar una campaña nueva para mi plataforma, usando una plantilla de landing que ya existe — el diseño ya está resuelto, no me preguntes nada de estilo ni me generes HTML. Antes de generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a cada una:
 
@@ -282,27 +286,25 @@ export function armarPromptCampanaNueva(variables: { key: string; label: string;
    - Asunto del email.
    - Contenido/speech de ese paso puntual.
 
-4. El contenido real para cada uno de estos campos que tiene la plantilla que elegiste (nunca inventes vos el contenido de negocio, eso lo doy yo). Te dejo la clave interna de cada uno porque las vas a necesitar en el bloque A de la respuesta:
+4. El contenido real para cada uno de estos campos que tiene la plantilla que elegiste (nunca inventes vos el contenido de negocio, eso lo doy yo):
 ${listaVariables}
 
-Con esas respuestas, generame DOS bloques, nada de explicaciones antes ni después:
+Con esas respuestas, generame UN SOLO JSON válido (sin comentarios, sin texto alrededor de ningún tipo), con exactamente esta estructura:
 
-A) Un JSON válido (sin comentarios, sin texto alrededor) con exactamente estas claves — cada una con el valor real que te di en el punto 4:
+{
+  "slug": "...",
+  "name": "...",
+  "advisor_name": "...",
+  "whatsapp_number": "...",
+  "whatsapp_message": "...",
+  "variables": ${jsonVariables},
+  "emails": [
+    { "step": 1, "offset_days": 0, "subject": "...", "content": "..." },
+    { "step": 2, "offset_days": 0, "subject": "...", "content": "..." }
+  ]
+}
 
-${jsonEjemplo}
+Reglas del array "emails": un objeto por cada paso que sí vayas a usar, en orden (step 1, 2, 3 o 4) — si un paso no se usa, no lo incluyas en el array (nunca un objeto vacío ni "no usar").
 
-B) El resto de los datos, en este formato exacto:
-
----
-Asesora — nombre: ...
-Asesora — WhatsApp: ...
-Mensaje prellenado de WhatsApp: ...
-
-Email 1 — días: ... / asunto: ... / contenido: ...
-Email 2 — días: ... / asunto: ... / contenido: ... (o "no usar")
-Email 3 — días: ... / asunto: ... / contenido: ... (o "no usar")
-Email 4 — días: ... / asunto: ... / contenido: ... (o "no usar")
----
-
-Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el JSON (A) lo pego directo en el cuadro "Pegar JSON" del formulario de campaña y completa solo todos los campos de variables; el resto (B) lo completo a mano, son pocos campos.`;
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): pego este JSON completo en el cuadro "Pegar JSON" del formulario de campaña nueva y completa TODO solo — slug, nombre, asesora, WhatsApp, cada email y las variables de contenido. Lo único que reviso a mano después es qué diseño de email usa cada paso (eso lo elijo yo en un desplegable, no depende del contenido).`;
 }
