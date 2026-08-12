@@ -204,10 +204,11 @@ export function CampaignForm({
   const [listaLandings, setListaLandings] = useState(landings);
   const [landingId, setLandingId] = useState(valoresIniciales?.landing_id ?? listaLandings[0]?.id ?? '');
   const [modalLandingAbierto, setModalLandingAbierto] = useState(false);
-  const variablesDeLaPlantilla = useMemo(
-    () => listaLandings.find((l) => l.id === landingId)?.landing_templates?.variables_schema ?? [],
+  const landingSeleccionada = useMemo(
+    () => listaLandings.find((l) => l.id === landingId) ?? null,
     [listaLandings, landingId]
   );
+  const variablesDeLaPlantilla = landingSeleccionada?.landing_templates?.variables_schema ?? [];
 
   // Completar a mano campo por campo no es viable en plantillas ricas
   // (hero + beneficios + planes + FAQ pueden ser 40-60 variables), y
@@ -352,7 +353,7 @@ export function CampaignForm({
     // sincronizado para lo que se siga tipeando de acá en más.
     sincronizarJson();
 
-    const nombreLanding = listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla';
+    const nombreLanding = landingSeleccionada?.landing_templates?.name ?? 'la plantilla';
     if (faltantes.length > 0) {
       // Esto es justo lo que pasó cuando el JSON pegado venía de un
       // prompt desactualizado: la IA devolvió solo 3 variables (titulo,
@@ -396,24 +397,43 @@ export function CampaignForm({
               + Crear landing nueva
             </button>
           </div>
-          <select
-            id="landing_id"
-            name="landing_id"
-            required
-            value={landingId}
-            onChange={(e) => setLandingId(e.target.value)}
-            className={inputClass}
-          >
-            {!landingId && <option value="">Elegí una landing</option>}
-            {listaLandings.map((l) => (
-              <option key={l.id} value={l.id}>
-                /{l.slug} — {l.name} — {l.landing_templates?.name ?? '—'}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-stretch gap-2">
+            <select
+              id="landing_id"
+              name="landing_id"
+              required
+              value={landingId}
+              onChange={(e) => setLandingId(e.target.value)}
+              className={`${inputClass} flex-1`}
+            >
+              {!landingId && <option value="">Elegí una landing</option>}
+              {listaLandings.map((l) => (
+                <option key={l.id} value={l.id}>
+                  /{l.slug} — {l.name} — {l.landing_templates?.name ?? '—'}
+                </option>
+              ))}
+            </select>
+            {landingSeleccionada && (
+              <a
+                href={`/${landingSeleccionada.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex items-center whitespace-nowrap rounded-one-sm border border-one-oscuro/15 px-4 text-sm font-bold text-one-oscuro transition-all duration-300 hover:bg-one-oscuro/5"
+              >
+                Visualizar landing ↗
+              </a>
+            )}
+          </div>
           {listaLandings.length === 0 && (
             <p className="mt-1 text-xs text-one-dorado">
               Todavía no hay ninguna landing creada — usá el botón de arriba para crear la primera.
+            </p>
+          )}
+          {landingSeleccionada && (
+            <p className="mt-1 text-xs text-one-oscuro/40">
+              Abre /{landingSeleccionada.slug} tal cual está en vivo ahora mismo — si esta campaña
+              todavía no está activa, puede mostrar el contenido de otra campaña activa en esa
+              misma landing (o nada, si no hay ninguna).
             </p>
           )}
         </div>
@@ -425,7 +445,7 @@ export function CampaignForm({
         </h2>
         <p className="mt-1 text-xs text-one-oscuro/40">
           El prompt ya trae las {variablesDeLaPlantilla.length} variable(s) de "
-          {listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla elegida'}
+          {landingSeleccionada?.landing_templates?.name ?? 'la plantilla elegida'}
           " — la IA te va a devolver un JSON con todas esas claves completas. Pegalo abajo y
           "Completar formulario" enchufa todo de una (opcional, también podés cargar todo a mano).
           Este cuadro también funciona al revés: siempre muestra lo que ya está cargado en el
