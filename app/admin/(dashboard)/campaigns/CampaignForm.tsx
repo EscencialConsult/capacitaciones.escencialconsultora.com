@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { NewEmailTemplateModal } from './NewEmailTemplateModal';
@@ -224,6 +224,63 @@ export function CampaignForm({
   const [jsonPegado, setJsonPegado] = useState('');
   const [mensajeJson, setMensajeJson] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
+  // El cuadro de JSON no es solo un lugar para pegar — también es un
+  // espejo en vivo de lo que ya está cargado en el formulario, para que
+  // nunca "se pierda" (ni al entrar a editar una campaña ya cargada, ni
+  // si se te va la página): lee directo del DOM (mismos ids que usa
+  // aplicarJson) y arma el mismo JSON que generaría el prompt.
+  function leerFormularioActual() {
+    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? '';
+    const variables: Record<string, string> = {};
+    for (const v of variablesDeLaPlantilla) variables[v.key] = val(`var_${v.key}`);
+    const emails: { step: number; offset_days: number; subject: string; content: string }[] = [];
+    for (let n = 1; n <= 4; n++) {
+      const subject = val(`step${n}_subject`);
+      const content = val(`step${n}_content`);
+      if (n === 1 || subject.trim() !== '' || content.trim() !== '') {
+        emails.push({ step: n, offset_days: Number(val(`step${n}_offset_days`)) || 0, subject, content });
+      }
+    }
+    return {
+      name: val('name'),
+      advisor_name: val('advisor_name'),
+      whatsapp_number: val('whatsapp_number'),
+      whatsapp_message: val('whatsapp_message'),
+      variables,
+      emails,
+    };
+  }
+
+  // Guarda el último JSON que armamos nosotros (no lo que el usuario
+  // haya tipeado/pegado a mano) — si lo que hay en el cuadro no
+  // coincide, significa que hay algo pegado todavía sin aplicar, y no
+  // lo pisamos por accidente con el estado actual del formulario.
+  const ultimoAutoSync = useRef('');
+  const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function sincronizarJson() {
+    const json = JSON.stringify(leerFormularioActual(), null, 2);
+    ultimoAutoSync.current = json;
+    setJsonPegado(json);
+  }
+
+  // Al entrar a la pantalla (o al cambiar de landing, que cambia qué
+  // variables existen) se refleja lo que ya está cargado — así el
+  // cuadro nunca arranca vacío ni desactualizado, ni siquiera editando
+  // una campaña que ya tenía todo cargado de antes.
+  useEffect(() => {
+    sincronizarJson();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variablesDeLaPlantilla]);
+
+  function alTipearEnElFormulario(e: React.FormEvent<HTMLFormElement>) {
+    const target = e.target as HTMLElement;
+    if (target.id === 'json_campana') return;
+    if (jsonPegado !== ultimoAutoSync.current) return; // hay algo pegado sin aplicar, no lo pisamos
+    if (syncTimeout.current) clearTimeout(syncTimeout.current);
+    syncTimeout.current = setTimeout(sincronizarJson, 400);
+  }
+
   function aplicarJson() {
     let datos: unknown;
     try {
@@ -290,6 +347,11 @@ export function CampaignForm({
       return;
     }
 
+    // Se aplicó algo de verdad — el cuadro pasa a reflejar el estado
+    // canónico del formulario (no lo que se pegó tal cual), así queda
+    // sincronizado para lo que se siga tipeando de acá en más.
+    sincronizarJson();
+
     const nombreLanding = listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla';
     if (faltantes.length > 0) {
       // Esto es justo lo que pasó cuando el JSON pegado venía de un
@@ -314,7 +376,7 @@ export function CampaignForm({
 
   return (
     <>
-    <form action={formAction} className="mt-6 space-y-6">
+    <form action={formAction} onInput={alTipearEnElFormulario} className="mt-6 space-y-6">
       <section className="rounded-one-lg bg-one-oscuro/5 p-5">
         <h2 className="text-sm font-bold text-one-oscuro">1. Elegí la landing</h2>
         <p className="mt-1 text-xs text-one-oscuro/40">
@@ -366,10 +428,12 @@ export function CampaignForm({
           {listaLandings.find((l) => l.id === landingId)?.landing_templates?.name ?? 'la plantilla elegida'}
           " — la IA te va a devolver un JSON con todas esas claves completas. Pegalo abajo y
           "Completar formulario" enchufa todo de una (opcional, también podés cargar todo a mano).
+          Este cuadro también funciona al revés: siempre muestra lo que ya está cargado en el
+          formulario de más abajo, así nunca se pierde — se actualiza solo apenas tipeás algo ahí.
         </p>
         <div className="mt-3 flex items-center justify-between">
           <label className={labelClass} htmlFor="json_campana">
-            JSON generado por la IA
+            JSON (reflejo en vivo de lo cargado — pegá acá para reemplazarlo)
           </label>
           <CopyLandingPromptButton variables={variablesDeLaPlantilla} />
         </div>
