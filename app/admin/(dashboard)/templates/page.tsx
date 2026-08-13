@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
+import { MARCAS, type Marca } from '@/lib/landing-template-defaults';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,7 @@ export default async function TemplatesPage() {
 
   const { data: templates } = await supabase
     .from('landing_templates')
-    .select('id, name, is_active, updated_at, landing_categories(name), landings(count)')
+    .select('id, name, marca, is_active, updated_at, landing_categories(name), landings(count)')
     .order('updated_at', { ascending: false });
 
   return (
@@ -31,6 +32,7 @@ export default async function TemplatesPage() {
             <tr>
               <th className="px-4 py-3 font-semibold">Nombre</th>
               <th className="px-4 py-3 font-semibold">Categoría</th>
+              <th className="px-4 py-3 font-semibold">Marca</th>
               <th className="px-4 py-3 font-semibold">Landings usándola</th>
               <th className="px-4 py-3 font-semibold">Estado</th>
               <th className="px-4 py-3 font-semibold">Actualizada</th>
@@ -45,6 +47,9 @@ export default async function TemplatesPage() {
                 <tr key={t.id} className="border-t border-one-oscuro/5">
                   <td className="px-4 py-3 font-semibold text-one-oscuro">{t.name}</td>
                   <td className="px-4 py-3 text-one-oscuro/60">{categoria?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-one-oscuro/60">
+                    {t.marca ? MARCAS[t.marca as Marca]?.nombre ?? t.marca : '—'}
+                  </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{usoCount}</td>
                   <td className="px-4 py-3">
                     <span
@@ -75,7 +80,7 @@ export default async function TemplatesPage() {
             })}
             {(templates ?? []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
+                <td colSpan={7} className="px-4 py-8 text-center text-one-oscuro/40">
                   Todavía no hay plantillas de landing creadas.
                 </td>
               </tr>

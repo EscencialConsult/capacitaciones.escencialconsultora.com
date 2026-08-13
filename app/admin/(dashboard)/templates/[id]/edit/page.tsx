@@ -11,7 +11,7 @@ export default async function EditTemplatePage({ params }: { params: { id: strin
   const [{ data: template }, { data: categorias }] = await Promise.all([
     supabase
       .from('landing_templates')
-      .select('id, name, category_id, html_content, variables_schema, is_active')
+      .select('id, name, category_id, marca, html_content, variables_schema, is_active')
       .eq('id', params.id)
       .single(),
     supabase.from('landing_categories').select('id, name').order('name'),

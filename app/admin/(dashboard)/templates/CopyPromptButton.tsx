@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { armarPromptPlantillaNueva } from '@/lib/landing-template-defaults';
+import { armarPromptPlantillaNueva, type Marca } from '@/lib/landing-template-defaults';
 
-export function CopyPromptButton() {
+export function CopyPromptButton({ marca }: { marca: Marca | null }) {
   const [copiado, setCopiado] = useState(false);
 
   return (
     <button
       type="button"
       onClick={async () => {
-        await navigator.clipboard.writeText(armarPromptPlantillaNueva());
+        await navigator.clipboard.writeText(armarPromptPlantillaNueva(marca));
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
       }}

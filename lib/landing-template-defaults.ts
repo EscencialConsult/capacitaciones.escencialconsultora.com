@@ -12,6 +12,75 @@ export type VariableSchema = {
 
 export type DescripcionVariable = { label?: string; descripcion?: string };
 
+/**
+ * Marcas con identidad fija (paleta + tipografía + logos ya definidos,
+ * no "a elección" en el prompt como el resto). Selección todavía no
+ * tiene logos/paleta cargados — se agrega acá el día que lleguen, ver
+ * supabase/migrations/0005_marca_en_landing_templates.sql para el
+ * check constraint que hay que ampliar también ese día.
+ */
+export type Marca = 'one' | 'escencial-latam' | 'escencial-argentina';
+
+type ConfigMarca = {
+  nombre: string;
+  colores: string[];
+  // Un degradado característico de la marca, además de la paleta plana
+  // — opcional, no todas las marcas tienen uno definido.
+  degradado?: string;
+  tipografiaPrincipal: string;
+  tipografiasSecundarias: string[];
+  logos: { blanco: string; negro: string; isotipo: string };
+  // Solo Escencial Argentina tiene datos de contacto reales definidos
+  // hoy (ver INFO_FOOTER_ESCENCIAL) — ONE y LATAM todavía no, así que
+  // el prompt no le exige a la IA inventar un footer para esas dos.
+  footer?: string;
+};
+
+// Colores y tipografías tal cual los pasó Facundo (2026-08-13) — nunca
+// inventar otros ni "mejorarlos": son la identidad real de cada marca.
+export const MARCAS: Record<Marca, ConfigMarca> = {
+  one: {
+    nombre: 'ONE',
+    colores: ['#000000', '#1a181d', '#fefeff', '#e17bd7', '#6be1e3', '#e4c76a', '#a4a8c0', '#c6c9d7'],
+    tipografiaPrincipal: 'Exo 2',
+    tipografiasSecundarias: ['Futura'],
+    logos: {
+      blanco: '/logos/one/logo-blanco.webp',
+      negro: '/logos/one/logo-negro.webp',
+      isotipo: '/logos/one/logo-isotipo.webp',
+    },
+  },
+  'escencial-latam': {
+    nombre: 'Escencial LATAM',
+    colores: [
+      '#210d41', '#b88917', '#e2b808', '#f4ce29', '#47278c',
+      '#953a90', '#252525', '#342f1d', '#c0c0c0', '#ffffff',
+    ],
+    degradado: 'de #280640 a #6e3eab',
+    tipografiaPrincipal: 'Neue Einstellung',
+    tipografiasSecundarias: ['Poppins', 'Garet', 'Aton'],
+    logos: {
+      blanco: '/logos/escencial-latam/logo-blanco.webp',
+      negro: '/logos/escencial-latam/logo-negro.webp',
+      isotipo: '/logos/escencial-latam/logo-isotipo.webp',
+    },
+  },
+  'escencial-argentina': {
+    nombre: 'Escencial Argentina',
+    colores: [
+      '#000000', '#252525', '#c0c0c0', '#ffffff', '#faf1f1',
+      '#020f27', '#0b4a6e', '#22d9df', '#1effff', '#6b9432', '#c1ff72',
+    ],
+    tipografiaPrincipal: 'Catamaran',
+    tipografiasSecundarias: ['Poppins', 'Aton', 'Carlito', 'Cerebri'],
+    logos: {
+      blanco: '/logos/escencial-argentina/logo-blanco.webp',
+      negro: '/logos/escencial-argentina/logo-negro.webp',
+      isotipo: '/logos/escencial-argentina/logo-isotipo.webp',
+    },
+  },
+};
+
 // Labels prolijas para las variables de siempre — cualquier otra clave
 // nueva que aparezca en el HTML se etiqueta automáticamente a partir de
 // su nombre (ver etiquetaDesdeClave), sin que haga falta mantener esta
@@ -239,14 +308,47 @@ LinkedIn: https://www.linkedin.com/company/escencialconsultora/
  * navegador de cada visitante, más lento justo en la página que más
  * importa que cargue rápido).
  */
-export function armarPromptPlantillaNueva() {
+export function armarPromptPlantillaNueva(marca: Marca | null = null) {
+  const config = marca ? MARCAS[marca] : null;
+
+  // Sin marca fija: el estilo queda 100% a elección (comportamiento de
+  // siempre). Con marca fija: paleta/tipografía/logos ya están
+  // resueltos, no se le pregunta nada de eso — solo qué secciones
+  // necesita y cómo se acomoda el layout con esa identidad.
+  const bloqueEstilo = config
+    ? `2. La landing es de la marca "${config.nombre}" — la identidad visual ya está resuelta, no me preguntes por colores, tipografía ni logo, usá EXACTAMENTE esto:
+
+   Paleta de colores (usalos tal cual, no inventes otros ni los combines con colores nuevos):
+   ${config.colores.join(', ')}
+${config.degradado ? `   Degradado característico de la marca: ${config.degradado} — usalo donde un fondo con degradado tenga sentido (hero, botón principal, etc.), no es obligatorio en todos lados.\n` : ''}
+   Tipografía: ${config.tipografiaPrincipal} para títulos, con ${config.tipografiasSecundarias.join(' / ')} como alternativas para el resto del texto. Si alguna de estas no está disponible en Google Fonts, elegí la alternativa gratuita de Google Fonts visualmente más parecida y decime en tu respuesta cuál elegiste y por qué — nunca uses una fuente de pago ni la cargues desde otro lado que no sea Google Fonts.
+
+   Logos — usalos con estas rutas EXACTAS (son archivos reales ya subidos, nunca inventes una URL ni un data:URI, nunca los busques en otro lado):
+   - Sobre fondo oscuro/de color: <img src="${config.logos.blanco}" alt="${config.nombre}">
+   - Sobre fondo claro/blanco: <img src="${config.logos.negro}" alt="${config.nombre}">
+   - Ícono/isotipo solo (favicon, badges, espacios chicos): <img src="${config.logos.isotipo}" alt="${config.nombre}">
+
+   Contame igual qué referencia de estilo tenés en mente para el LAYOUT (moderno/minimalista/corporativo, cuánto espacio en blanco, alguna landing que te guste como referencia) — eso sigue siendo libre, lo único fijo es color/tipografía/logo.`
+    : `2. Estilo/diseño visual: colores, referencia de marca, humor, alguna landing existente que te guste como referencia. Si no tengo nada específico, decime que uses cualquier estilo prolijo y moderno.`;
+
+  const bloqueFooter = config?.footer
+    ? `   - Agregá un footer al final con los datos reales de contacto de acá abajo — SIEMPRE estos datos exactos, tal cual están escritos (dirección, teléfonos, email, redes), nunca inventes otros ni los cambies. Diseñalo acorde al resto (colores, tipografía), pero el texto y los links no se tocan. No hace falta poner las 3 sucursales una al lado de la otra si no entran bien visualmente — un acordeón, tabs, o simplemente apiladas en columnas también sirve, es una decisión de layout, no de contenido.\n`
+    : marca
+      ? `   - Esta marca todavía no tiene datos de contacto fijos cargados en el sistema — si la sección de footer que armamos en la pregunta 1 necesita dirección/teléfono/redes, preguntámelo en esa misma pregunta, no inventes ningún dato de contacto.\n`
+      : `   - Agregá un footer al final con los datos reales de contacto de acá abajo — SIEMPRE estos datos exactos, tal cual están escritos (dirección, teléfonos, email, redes), nunca inventes otros ni los cambies. Diseñalo acorde al resto (colores, tipografía), pero el texto y los links no se tocan. No hace falta poner las 3 sucursales una al lado de la otra si no entran bien visualmente — un acordeón, tabs, o simplemente apiladas en columnas también sirve, es una decisión de layout, no de contenido.\n`;
+
+  const bloqueDatosFooter =
+    !marca || config?.footer
+      ? `\n\nDatos reales para el footer (usar tal cual, nunca inventar otros):\n\n\`\`\`\n${config?.footer ?? INFO_FOOTER_ESCENCIAL}\n\`\`\``
+      : '';
+
   return `Necesito armar una plantilla de landing nueva para mi plataforma — esto es SOLO el diseño visual reutilizable. No es una campaña puntual: el nombre de la campaña, la asesora, el WhatsApp y el contenido de los emails de seguimiento se cargan después, en otro paso, cuando conecte esta plantilla a una campaña real. No me preguntes nada de eso.
 
 Antes de generar nada, hacéme estas preguntas UNA POR UNA y esperá mi respuesta a cada una:
 
 1. Qué secciones necesita la landing (por ejemplo: hero con título/subtítulo/botón, beneficios o módulos, planes de precio, testimonios, preguntas frecuentes, footer con datos de contacto). Para cada sección que uses, decime qué campos van a cambiar de una campaña a otra — por ejemplo, en una sección de precios: ¿cuántos planes hay?, ¿cada uno tiene nombre + precio + texto de botón propio? Todavía no hace falta contenido real, eso se completa por campaña.
 
-2. Estilo/diseño visual: colores, referencia de marca, humor, alguna landing existente que te guste como referencia. Si no tengo nada específico, decime que uses cualquier estilo prolijo y moderno.
+${bloqueEstilo}
 
 Con esas respuestas, generame el HTML completo de la plantilla. Partí EXACTAMENTE del HTML base de acá abajo — es la parte funcional real, ya probada (el formulario y el script que mandan los datos). NO toques los inputs, sus atributos "name", el input oculto "landing_id", ni el bloque <script>. Lo único que agregás es el diseño visual completo alrededor:
    - Meté todo el estilo en una etiqueta <style> propia, escrito a mano (CSS normal) — NADA de Tailwind por CDN ni ningún framework externo de CSS/JS: la landing tiene que cargar rápido para el lead que recién llega.
@@ -254,8 +356,7 @@ Con esas respuestas, generame el HTML completo de la plantilla. Partí EXACTAMEN
    - Íconos: SVG inline si hacen falta, nunca una librería de íconos externa.
    - Cada campo de contenido que vaya a variar por campaña (título, precio, lo que sea) va como {{clave}} — elegí vos el nombre de cada clave, en minúsculas y sin espacios (ej: {{precio_plan_1}}). No hace falta declararlas en ningún lado aparte: el sistema las detecta solas apenas pegue este HTML en el panel.
    - Los placeholders {{titulo}}, {{subtitulo}}, {{boton_texto}} y el reservado {{__landing_id__}} ya vienen en el HTML base — podés mantenerlos, moverlos, o sacarlos y usar tus propias claves si el diseño no los necesita tal cual. Lo único que no se toca es la lógica del <form> y el <script>.
-   - Agregá un footer al final con los datos reales de contacto de acá abajo — SIEMPRE estos datos exactos, tal cual están escritos (dirección, teléfonos, email, redes), nunca inventes otros ni los cambies. Diseñalo acorde al resto (colores, tipografía), pero el texto y los links no se tocan. No hace falta poner las 3 sucursales una al lado de la otra si no entran bien visualmente — un acordeón, tabs, o simplemente apiladas en columnas también sirve, es una decisión de layout, no de contenido.
-
+${bloqueFooter}
 Dame DOS bloques, nada de explicaciones antes ni después:
 
 A) El HTML completo, como se explicó arriba.
@@ -271,15 +372,9 @@ HTML base (función fija, diseño libre):
 
 \`\`\`html
 ${HTML_BASE}
-\`\`\`
+\`\`\`${bloqueDatosFooter}
 
-Datos reales para el footer (usar tal cual, nunca inventar otros):
-
-\`\`\`
-${INFO_FOOTER_ESCENCIAL}
-\`\`\`
-
-Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel — el nombre interno de la plantilla y la categoría los cargo yo directo ahí, no hace falta que me los preguntes. El JSON (B) lo pego en el campo "Descripciones de variables" de esa misma pantalla — así el prompt que voy a copiar después, cuando cree una campaña con esta plantilla, ya sabe qué significa cada variable.`;
+Cómo lo voy a usar yo (no hace falta que hagas nada con esto, es solo contexto): el HTML (A) lo subo como plantilla nueva en el panel — el nombre interno de la plantilla, la categoría y la marca los cargo yo directo ahí, no hace falta que me los preguntes. El JSON (B) lo pego en el campo "Descripciones de variables" de esa misma pantalla — así el prompt que voy a copiar después, cuando cree una campaña con esta plantilla, ya sabe qué significa cada variable.`;
 }
 
 /**

@@ -13,6 +13,10 @@ import {
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
   category_id: z.string().uuid().optional().or(z.literal('')),
+  // Marca con identidad fija (paleta/tipografía/logos) — ver
+  // lib/landing-template-defaults.ts → MARCAS. Vacío = plantilla
+  // genérica sin marca fija, mismo comportamiento de siempre.
+  marca: z.enum(['one', 'escencial-latam', 'escencial-argentina']).optional().or(z.literal('')),
   html_content: z.string().min(1, 'Falta el HTML de la plantilla.'),
   is_active: z.enum(['true', 'false']),
   // Bloque B del prompt de plantilla (opcional) — label + descripción
@@ -56,6 +60,7 @@ function parseTemplateForm(formData: FormData) {
     data: {
       name: parsed.data.name,
       category_id: parsed.data.category_id || null,
+      marca: parsed.data.marca || null,
       html_content: parsed.data.html_content,
       variables_schema: combinarVariables(detectadas, descripciones),
       is_active: parsed.data.is_active === 'true',

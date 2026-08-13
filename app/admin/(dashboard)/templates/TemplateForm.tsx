@@ -8,7 +8,9 @@ import {
   HTML_BASE,
   extraerVariablesDeHtml,
   combinarVariables,
+  MARCAS,
   type VariableSchema,
+  type Marca,
 } from '@/lib/landing-template-defaults';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
@@ -53,12 +55,14 @@ export function TemplateForm({
   valoresIniciales?: {
     name: string;
     category_id: string | null;
+    marca: Marca | null;
     html_content: string;
     variables_schema: VariableSchema[] | null;
     is_active: boolean;
   };
 }) {
   const [state, formAction] = useFormState(action, undefined);
+  const [marca, setMarca] = useState<Marca | ''>(valoresIniciales?.marca ?? '');
   const [html, setHtml] = useState(valoresIniciales?.html_content ?? HTML_BASE);
   const [variablesMeta, setVariablesMeta] = useState(
     () => serializarDescripciones(valoresIniciales?.variables_schema ?? [])
@@ -130,6 +134,30 @@ export function TemplateForm({
         )}
 
         <div>
+          <label className={labelClass} htmlFor="marca">
+            Marca
+          </label>
+          <select
+            id="marca"
+            name="marca"
+            value={marca}
+            onChange={(e) => setMarca(e.target.value as Marca | '')}
+            className={inputClass}
+          >
+            <option value="">— Sin marca específica (estilo libre) —</option>
+            {(Object.keys(MARCAS) as Marca[]).map((m) => (
+              <option key={m} value={m}>
+                {MARCAS[m].nombre}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-one-oscuro/40">
+            Si elegís una marca, el prompt de abajo fija su paleta, tipografía y logos exactos — ya
+            no hay que definir colores a mano cada vez.
+          </p>
+        </div>
+
+        <div>
           <label className={labelClass} htmlFor="is_active">
             Estado
           </label>
@@ -149,7 +177,7 @@ export function TemplateForm({
             <label className={labelClass} htmlFor="html_content">
               HTML de la plantilla
             </label>
-            <CopyPromptButton />
+            <CopyPromptButton marca={marca || null} />
           </div>
           <textarea
             id="html_content"
