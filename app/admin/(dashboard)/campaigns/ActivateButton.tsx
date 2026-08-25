@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Play } from 'lucide-react';
 import { activateCampaign } from './actions';
+import { IconActionGlyph } from '../IconAction';
 
 export function ActivateButton({
   campaignId,
@@ -30,6 +32,8 @@ export function ActivateButton({
     <div className="inline-flex items-center gap-2">
       <button
         type="button"
+        title={label}
+        aria-label={label}
         disabled={busy}
         onClick={() => {
           setError(null);
@@ -50,9 +54,14 @@ export function ActivateButton({
             }
           });
         }}
-        className="rounded-full border border-one-fucsia/30 bg-one-fucsia/5 px-4 py-1.5 text-xs font-bold text-one-fucsia transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/15 hover:shadow-one-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 disabled:pointer-events-none disabled:opacity-60"
+        // Ícono en vez de texto (2026-08-25, pedido de Facundo) — se
+        // mantiene el tinte fucsia (a diferencia de los demás IconAction,
+        // neutros) porque activar es la acción más importante de una fila
+        // en borrador/pausada, se merece más peso visual que un ícono
+        // gris más — mismo criterio que ya tenía el botón de texto.
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-one-fucsia/30 bg-one-fucsia/5 text-one-fucsia transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/15 hover:shadow-one-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 disabled:pointer-events-none disabled:opacity-60"
       >
-        {busy ? `${label === 'Reactivar' ? 'Reactivando' : 'Activando'}...` : label}
+        <IconActionGlyph icon={Play} busy={busy} />
       </button>
       {error && <span className="text-xs text-one-rojo">{error}</span>}
     </div>

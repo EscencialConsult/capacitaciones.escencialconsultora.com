@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ClipboardList, Users, Clock, TriangleAlert } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { TableShell, TableHead, TableEmptyRow } from './AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,16 +95,8 @@ export default async function AdminHomePage() {
 
       <div className="mt-8">
         <h2 className="text-sm font-bold text-one-oscuro">Últimos leads</h2>
-        <div className="mt-3 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-              <tr>
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Campaña</th>
-                <th className="px-4 py-3">Fecha</th>
-              </tr>
-            </thead>
+        <TableShell>
+            <TableHead columns={['Nombre', 'Email', 'Campaña', 'Fecha']} />
             <tbody>
               {(ultimosLeads ?? []).map((lead) => {
                 const campana = lead.campaigns as unknown as {
@@ -128,16 +121,9 @@ export default async function AdminHomePage() {
                   </tr>
                 );
               })}
-              {(ultimosLeads ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-one-oscuro/40">
-                    Todavía no hay leads.
-                  </td>
-                </tr>
-              )}
+              {(ultimosLeads ?? []).length === 0 && <TableEmptyRow colSpan={4}>Todavía no hay leads.</TableEmptyRow>}
             </tbody>
-          </table>
-        </div>
+        </TableShell>
       </div>
     </div>
   );

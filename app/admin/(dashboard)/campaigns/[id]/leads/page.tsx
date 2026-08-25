@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Check, Clock, X, Minus } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,20 +140,19 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
         </span>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Teléfono</th>
-              <th className="px-4 py-3">Click WhatsApp</th>
-              {esEnvioPersonalizado && <th className="px-4 py-3">Opción elegida</th>}
-              <th className="px-4 py-3">Etapas de email</th>
-              <th className="px-4 py-3">Ingresó</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead
+          columns={[
+            'Nombre',
+            'Email',
+            'Teléfono',
+            'Click WhatsApp',
+            ...(esEnvioPersonalizado ? ['Opción elegida'] : []),
+            'Etapas de email',
+            'Ingresó',
+          ]}
+        />
+        <tbody>
             {(leads ?? []).map((lead, i) => {
               const sends = (lead.email_sends as EmailSend[]) ?? [];
               // Por cada paso CONFIGURADO en la campaña (no por cada envío
@@ -235,15 +235,10 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
               );
             })}
             {(leads ?? []).length === 0 && (
-              <tr>
-                <td colSpan={esEnvioPersonalizado ? 7 : 6} className="px-4 py-8 text-center text-one-oscuro/40">
-                  Todavía no hay leads en esta campaña.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={esEnvioPersonalizado ? 7 : 6}>Todavía no hay leads en esta campaña.</TableEmptyRow>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

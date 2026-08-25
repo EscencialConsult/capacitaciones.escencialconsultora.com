@@ -150,27 +150,26 @@
 /* Fila de tabla con acento a la izquierda en hover — reemplaza el
    hover plano (bg gris) por una señal más precisa de "esta fila", sin
    sombra ni glow (ver skill anti-ia: el tratamiento fuerte se reserva
-   para lo que lo amerita, una fila de tabla no es eso). */
+   para lo que lo amerita, una fila de tabla no es eso).
+   Bug real confirmado (2026-08-25): la versión anterior usaba
+   `position: relative` en el <tr> + un ::before absoluto para la
+   barrita. Un <tr> es `display: table-row`, y sacarlo de `static` con
+   `position: relative` es un quiebre clásico del algoritmo de layout
+   de tablas — distintos motores lo tratan de forma inconsistente,
+   y el resultado visible era el encabezado desalineado con el
+   contenido de cada fila, en TODAS las tablas por igual (es la única
+   regla que comparten todas, hasta la de "Últimos leads" sin íconos
+   ni texto largo). `box-shadow: inset` pinta la misma barrita sin
+   sacar la fila de flujo normal ni crear un contexto de posicionamiento. */
 .table-row-hover {
-  position: relative;
-  transition: background-color 150ms ease-out;
-}
-.table-row-hover::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--one-fucsia, #e17bd7);
-  transform: scaleY(0);
-  transition: transform 150ms ease-out;
+  box-shadow: inset 3px 0 0 0 transparent;
+  transition:
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
 }
 .table-row-hover:hover {
   background-color: rgba(26, 24, 29, 0.025);
-}
-.table-row-hover:hover::before {
-  transform: scaleY(1);
+  box-shadow: inset 3px 0 0 0 var(--one-fucsia, #e17bd7);
 }
 
 /* Shimmer del loading.tsx — barrido de brillo sobre los bloques grises

@@ -1,8 +1,12 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import { Pencil } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
 import { deleteTemplate } from './actions';
 import { DeleteButton } from '../DeleteButton';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
+import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
 import { MARCAS, type Marca } from '@/lib/landing-template-defaults';
 
 export const dynamic = 'force-dynamic';
@@ -68,26 +72,38 @@ export default async function TemplatesPage({
         </p>
       )}
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Marca</th>
-              <th className="px-4 py-3">Landings usándola</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Actualizada</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead columns={['Nombre', 'Marca', 'Landings usándola', 'Estado', 'Actualizada', '']} />
+        <tbody>
             {(templates ?? []).map((t) => {
               const usoCount = (t.landings as unknown as { count: number }[])?.[0]?.count ?? 0;
               return (
                 <tr key={t.id} className="table-row-hover border-t border-one-oscuro/5">
-                  <td className="px-4 py-3 font-semibold text-one-oscuro">{t.name}</td>
-                  <td className="px-4 py-3 text-one-oscuro/60">
-                    {t.marca ? MARCAS[t.marca as Marca]?.nombre ?? t.marca : '—'}
+                  {/* Bug real confirmado (2026-08-25) — sin truncar, un nombre
+                      largo pasaba a 2 líneas y esa fila quedaba más alta que
+                      el resto, descuadrando toda la tabla. */}
+                  <td className="px-4 py-3 font-semibold text-one-oscuro">
+                    <span className="block max-w-xs truncate" title={t.name}>
+                      {t.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {/* Logo, no el nombre (2026-08-25, pedido explícito) — el
+                        isotipo de cada marca ya es un círculo consistente en
+                        todas (fondo negro + marca adentro), mismo tamaño fijo
+                        que Avatar.tsx para que la fila no cambie de alto. */}
+                    {t.marca && MARCAS[t.marca as Marca] ? (
+                      <Image
+                        src={MARCAS[t.marca as Marca].logos.isotipo}
+                        alt={MARCAS[t.marca as Marca].nombre}
+                        title={MARCAS[t.marca as Marca].nombre}
+                        width={40}
+                        height={40}
+                        className="size-10 shrink-0 rounded-full object-cover ring-1 ring-one-oscuro/10"
+                      />
+                    ) : (
+                      <span className="text-one-oscuro/30">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{usoCount}</td>
                   <td className="px-4 py-3">
@@ -103,12 +119,14 @@ export default async function TemplatesPage({
                     {new Date(t.updated_at).toLocaleDateString('es-AR')}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/admin/templates/${t.id}/edit`}
-                        className="text-sm font-semibold text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia"
+                        title="Editar"
+                        aria-label={`Editar ${t.name}`}
+                        className={iconActionClass()}
                       >
-                        Editar
+                        <IconActionGlyph icon={Pencil} />
                       </Link>
                       <ToggleActivaButton templateId={t.id} activa={t.is_active} />
                       <DeleteButton itemLabel={`la plantilla "${t.name}"`} onDelete={deleteTemplate.bind(null, t.id)} />
@@ -118,17 +136,14 @@ export default async function TemplatesPage({
               );
             })}
             {(templates ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
-                  {personalizado
-                    ? 'Todavía no hay plantillas de envío personalizado creadas.'
-                    : 'Todavía no hay plantillas de landing creadas.'}
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={6}>
+                {personalizado
+                  ? 'Todavía no hay plantillas de envío personalizado creadas.'
+                  : 'Todavía no hay plantillas de landing creadas.'}
+              </TableEmptyRow>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
-import { Link2, Sparkles, FileText, UserRound } from 'lucide-react';
+import { Link2, Sparkles, FileText, UserRound, ExternalLink } from 'lucide-react';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { NewEmailTemplateModal } from './NewEmailTemplateModal';
 import { NewLandingModal } from './NewLandingModal';
@@ -626,7 +626,8 @@ export function CampaignForm({
                   }
                 >
                   {cambiosSinRevisar && <span className="size-2 flex-none rounded-full bg-one-fucsia" />}
-                  {cambiosSinRevisar ? 'Ver cambios en vivo ↗' : 'Visualizar landing ↗'}
+                  <ExternalLink className="size-4" strokeWidth={1.75} />
+                  {cambiosSinRevisar ? 'Ver cambios en vivo' : 'Visualizar landing'}
                 </a>
               )}
             </div>

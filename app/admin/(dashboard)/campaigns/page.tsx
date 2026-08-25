@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { Pencil, Contact, Pause, Archive } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ActivateButton } from './ActivateButton';
 import { CampaignStatusButton } from './CampaignStatusButton';
 import { pauseCampaign, archiveCampaign, deleteCampaign } from './actions';
 import { DeleteButton } from '../DeleteButton';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
+import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,20 +62,9 @@ export default async function CampaignsPage() {
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Categoría</th>
-              <th className="px-4 py-3">Landing</th>
-              <th className="px-4 py-3">Plantilla</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Emails cargados</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead columns={['Nombre', 'Categoría', 'Landing', 'Plantilla', 'Estado', 'Emails cargados', 'Acciones']} />
+        <tbody>
             {(campanas ?? []).map((c, i) => {
               const landing = c.landings as unknown as {
                 slug: string;
@@ -87,12 +79,32 @@ export default async function CampaignsPage() {
                   style={{ '--stagger-index': i } as React.CSSProperties}
                   className="stagger-in table-row-hover border-t border-one-oscuro/5"
                 >
-                  <td className="px-4 py-3 text-one-oscuro">{c.name}</td>
-                  <td className="px-4 py-3 text-one-oscuro/60">{categoria?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-one-oscuro/50">
-                    {landing ? `/${landing.slug}` : '— Sin landing —'}
+                  {/* Bug real confirmado (2026-08-25) — sin truncar, un nombre
+                      largo (ej. "Servicio Prueba 1 — Tecnología Agosto 2026")
+                      pasaba a 2 líneas y esa fila quedaba más alta que el
+                      resto, descuadrando toda la tabla. max-w + truncate deja
+                      TODAS las filas a la misma altura; el texto completo
+                      sigue disponible con el `title` nativo al pasar el mouse. */}
+                  <td className="px-4 py-3 text-one-oscuro">
+                    <span className="block max-w-xs truncate" title={c.name}>
+                      {c.name}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-one-oscuro/60">{landing?.landing_templates?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-one-oscuro/60">
+                    <span className="block max-w-[140px] truncate" title={categoria?.name}>
+                      {categoria?.name ?? '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-one-oscuro/50">
+                    <span className="block max-w-[160px] truncate" title={landing ? `/${landing.slug}` : undefined}>
+                      {landing ? `/${landing.slug}` : '— Sin landing —'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-one-oscuro/60">
+                    <span className="block max-w-[160px] truncate" title={landing?.landing_templates?.name}>
+                      {landing?.landing_templates?.name ?? '—'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeEstado[c.status] ?? ''}`}>
                       {textoEstado[c.status] ?? c.status}
@@ -100,7 +112,7 @@ export default async function CampaignsPage() {
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{cantidadEmails}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
                       {/* Siempre visible — si la campaña ya no está en
                           borrador, el propio /edit redirige solo a Ver
                           leads (ver el guard en [id]/edit/page.tsx):
@@ -109,15 +121,19 @@ export default async function CampaignsPage() {
                           sus pasos actuales. */}
                       <Link
                         href={`/admin/campaigns/${c.id}/edit`}
-                        className="rounded-one-sm font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+                        title="Editar"
+                        aria-label={`Editar ${c.name}`}
+                        className={iconActionClass()}
                       >
-                        Editar
+                        <IconActionGlyph icon={Pencil} />
                       </Link>
                       <Link
                         href={`/admin/campaigns/${c.id}/leads`}
-                        className="rounded-one-sm font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+                        title="Ver leads"
+                        aria-label={`Ver leads de ${c.name}`}
+                        className={iconActionClass()}
                       >
-                        Ver leads
+                        <IconActionGlyph icon={Contact} />
                       </Link>
                       {(c.status === 'draft' || c.status === 'paused') && landing && (
                         <ActivateButton
@@ -129,18 +145,20 @@ export default async function CampaignsPage() {
                       {c.status === 'active' && (
                         <CampaignStatusButton
                           label="Pausar"
-                          pendingLabel="Pausando"
                           confirmMessage={`¿Pausar "${c.name}"? Deja de mostrarse en ${landing ? `/${landing.slug}` : 'su landing'} hasta que la reactives.`}
                           action={pauseCampaign.bind(null, c.id)}
-                        />
+                        >
+                          <Pause className="size-[18px]" strokeWidth={1.75} />
+                        </CampaignStatusButton>
                       )}
                       {c.status !== 'archived' && (
                         <CampaignStatusButton
                           label="Archivar"
-                          pendingLabel="Archivando"
                           confirmMessage={`¿Archivar "${c.name}"? Se cierra el ciclo de esta campaña — se puede seguir consultando pero no se va a poder reactivar.`}
                           action={archiveCampaign.bind(null, c.id)}
-                        />
+                        >
+                          <Archive className="size-[18px]" strokeWidth={1.75} />
+                        </CampaignStatusButton>
                       )}
                       <DeleteButton itemLabel={`la campaña "${c.name}"`} onDelete={deleteCampaign.bind(null, c.id)} />
                     </div>
@@ -149,15 +167,10 @@ export default async function CampaignsPage() {
               );
             })}
             {(campanas ?? []).length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-one-oscuro/40">
-                  No hay ninguna campaña todavía. Creá una nueva para arrancar.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={7}>No hay ninguna campaña todavía. Creá una nueva para arrancar.</TableEmptyRow>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

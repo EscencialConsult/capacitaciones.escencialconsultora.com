@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { Pencil } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { EnviarPendientesButton } from './EnviarPendientesButton';
 import { LandingToggleActivaButton } from './LandingToggleActivaButton';
 import { deleteLanding } from './actions';
 import { DeleteButton } from '../DeleteButton';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
+import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,37 +44,41 @@ export default async function LandingsPage() {
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Link</th>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Plantilla</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Campaña conectada</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead columns={['Link', 'Nombre', 'Plantilla', 'Estado', 'Campaña conectada', '']} />
+        <tbody>
             {(landings ?? []).map((l) => {
               const plantilla = l.landing_templates as unknown as { name: string } | null;
               const campanas = (l.campaigns as unknown as { id: string; name: string; status: string }[]) ?? [];
               const campanaActiva = campanas.find((c) => c.status === 'active');
               return (
                 <tr key={l.id} className="table-row-hover border-t border-one-oscuro/5">
+                  {/* Bug real confirmado (2026-08-25) — sin truncar, un texto
+                      largo pasaba a 2 líneas y esa fila quedaba más alta que
+                      el resto, descuadrando toda la tabla. max-w + truncate
+                      deja TODAS las filas a la misma altura; el texto
+                      completo sigue disponible con el `title` nativo. */}
                   <td className="px-4 py-3">
                     <a
                       href={`/${l.slug}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
+                      title={`/${l.slug}`}
+                      className="block max-w-[160px] truncate font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
                     >
                       /{l.slug}
                     </a>
                   </td>
-                  <td className="px-4 py-3 text-one-oscuro">{l.name}</td>
-                  <td className="px-4 py-3 text-one-oscuro/60">{plantilla?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-one-oscuro">
+                    <span className="block max-w-xs truncate" title={l.name}>
+                      {l.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-one-oscuro/60">
+                    <span className="block max-w-[160px] truncate" title={plantilla?.name}>
+                      {plantilla?.name ?? '—'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-one-sm px-2 py-0.5 text-xs font-semibold ${
@@ -85,7 +92,8 @@ export default async function LandingsPage() {
                     {campanaActiva ? (
                       <Link
                         href={`/admin/campaigns/${campanaActiva.id}/leads`}
-                        className="text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia hover:underline"
+                        title={campanaActiva.name}
+                        className="block max-w-[160px] truncate text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia hover:underline"
                       >
                         {campanaActiva.name}
                       </Link>
@@ -94,12 +102,14 @@ export default async function LandingsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/admin/landings/${l.id}/edit`}
-                        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-fucsia"
+                        title="Editar"
+                        aria-label={`Editar ${l.name}`}
+                        className={iconActionClass()}
                       >
-                        Editar
+                        <IconActionGlyph icon={Pencil} />
                       </Link>
                       <LandingToggleActivaButton
                         landingId={l.id}
@@ -113,15 +123,10 @@ export default async function LandingsPage() {
               );
             })}
             {(landings ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
-                  Todavía no hay ninguna landing creada. Creá la primera para arrancar.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={6}>Todavía no hay ninguna landing creada. Creá la primera para arrancar.</TableEmptyRow>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

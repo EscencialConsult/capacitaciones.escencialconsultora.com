@@ -27,7 +27,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <DashboardSidebar avatar={avatar} email={email} />
         <div className="flex flex-1 flex-col overflow-y-auto">
           <DashboardHeader email={email} avatar={avatar} />
-          <main className="relative mx-auto w-full max-w-6xl flex-1 bg-one-dots bg-one-dots-size bg-fixed px-6 py-8">
+          {/* Sin max-w (2026-08-25, pedido explícito) — con el tope
+              anterior (max-w-6xl, 1152px) sobraba muchísimo espacio
+              vacío a los costados en cualquier pantalla ancha real;
+              ahora el contenido usa el ancho disponible completo,
+              limitado solo por el padding. */}
+          <main className="relative w-full flex-1 bg-one-dots bg-one-dots-size bg-fixed px-8 py-8">
             <div className="relative">{children}</div>
           </main>
         </div>

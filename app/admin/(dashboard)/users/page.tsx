@@ -2,6 +2,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { UserActions } from './UserActions';
 import { CreateUserForm } from './CreateUserForm';
 import { Avatar } from '../Avatar';
+import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,20 +23,9 @@ export default async function UsersPage() {
 
       <CreateUserForm />
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Celular</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Último acceso</th>
-              <th className="px-4 py-3">Creado</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead columns={['Nombre', 'Email', 'Celular', 'Estado', 'Último acceso', 'Creado', '']} />
+        <tbody>
             {(users ?? []).map((u) => {
               const baneado = !!u.banned_until && new Date(u.banned_until) > new Date();
               // user_metadata es JSON libre (sin tabla de perfiles propia
@@ -50,13 +40,22 @@ export default async function UsersPage() {
               const nombreCompleto = [meta.nombre, meta.apellido].filter(Boolean).join(' ');
               return (
                 <tr key={u.id} className="table-row-hover border-t border-one-oscuro/5">
+                  {/* Bug real confirmado (2026-08-25) — sin truncar, un nombre
+                      o email largo pasaba a 2 líneas y esa fila quedaba más
+                      alta que el resto, descuadrando toda la tabla. */}
                   <td className="px-4 py-3 text-one-oscuro">
-                    <div className="flex items-center gap-2">
+                    <div className="flex max-w-[200px] items-center gap-2">
                       <Avatar avatar={meta.avatar} email={u.email} size="sm" />
-                      {nombreCompleto || '—'}
+                      <span className="truncate" title={nombreCompleto || undefined}>
+                        {nombreCompleto || '—'}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-one-oscuro">{u.email}</td>
+                  <td className="px-4 py-3 font-semibold text-one-oscuro">
+                    <span className="block max-w-[220px] truncate" title={u.email}>
+                      {u.email}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{meta.celular || '—'}</td>
                   <td className="px-4 py-3">
                     <span
@@ -84,16 +83,9 @@ export default async function UsersPage() {
                 </tr>
               );
             })}
-            {(users ?? []).length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-one-oscuro/40">
-                  No hay usuarios.
-                </td>
-              </tr>
-            )}
+            {(users ?? []).length === 0 && <TableEmptyRow colSpan={7}>No hay usuarios.</TableEmptyRow>}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { UserCheck, UserX } from 'lucide-react';
 import { toggleUserBan, deleteUser } from './actions';
 import { DeleteButton } from '../DeleteButton';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
 
 export function UserActions({
   userId,
@@ -18,15 +20,18 @@ export function UserActions({
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const label = baneado ? 'Habilitar' : 'Deshabilitar';
 
   if (esUsuarioActual) {
     return <span className="text-xs text-one-oscuro/40">(vos)</span>;
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-1.5">
       <button
         type="button"
+        title={label}
+        aria-label={`${label} a ${email}`}
         disabled={busy}
         onClick={() => {
           setBusy(true);
@@ -40,9 +45,9 @@ export function UserActions({
             }
           });
         }}
-        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-oscuro disabled:opacity-50"
+        className={iconActionClass(baneado ? 'exito' : 'peligro')}
       >
-        {baneado ? 'Habilitar' : 'Deshabilitar'}
+        <IconActionGlyph icon={baneado ? UserCheck : UserX} busy={busy} />
       </button>
       {/* Mismo botón de borrado en 2 pasos que landings/plantillas/campañas
           (ver comentario en DeleteButton.tsx) — eliminar una cuenta de admin

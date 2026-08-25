@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Play, CircleOff } from 'lucide-react';
 import { toggleTemplateActive } from './actions';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
 
 export function ToggleActivaButton({ templateId, activa }: { templateId: string; activa: boolean }) {
   const [, startTransition] = useTransition();
@@ -19,11 +21,14 @@ export function ToggleActivaButton({ templateId, activa }: { templateId: string;
   // porque lo prendemos antes del await y lo apagamos en el finally.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const label = activa ? 'Desactivar' : 'Activar';
 
   return (
     <div className="inline-flex items-center gap-2">
       <button
         type="button"
+        title={label}
+        aria-label={label}
         disabled={busy}
         onClick={() => {
           setError(null);
@@ -37,9 +42,9 @@ export function ToggleActivaButton({ templateId, activa }: { templateId: string;
             }
           });
         }}
-        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-oscuro disabled:pointer-events-none disabled:opacity-50"
+        className={iconActionClass(activa ? 'peligro' : 'neutro')}
       >
-        {activa ? 'Desactivar' : 'Activar'}
+        <IconActionGlyph icon={activa ? CircleOff : Play} busy={busy} />
       </button>
       {error && <span className="text-xs text-one-rojo">{error}</span>}
     </div>

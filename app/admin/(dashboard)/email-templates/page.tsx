@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { Pencil } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
+import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,20 +26,19 @@ export default async function EmailTemplatesPage() {
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
-            <tr>
-              <th className="px-4 py-3">Nombre</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Actualizada</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <TableHead columns={['Nombre', 'Estado', 'Actualizada', '']} />
+        <tbody>
             {(templates ?? []).map((t) => (
               <tr key={t.id} className="table-row-hover border-t border-one-oscuro/5">
-                <td className="px-4 py-3 font-semibold text-one-oscuro">{t.name}</td>
+                {/* Bug real confirmado (2026-08-25) — sin truncar, un nombre
+                    largo pasaba a 2 líneas y esa fila quedaba más alta que
+                    el resto, descuadrando toda la tabla. */}
+                <td className="px-4 py-3 font-semibold text-one-oscuro">
+                  <span className="block max-w-xs truncate" title={t.name}>
+                    {t.name}
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -50,12 +52,14 @@ export default async function EmailTemplatesPage() {
                   {new Date(t.updated_at).toLocaleDateString('es-AR')}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
                     <Link
                       href={`/admin/email-templates/${t.id}/edit`}
-                      className="text-sm font-semibold text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia"
+                      title="Editar"
+                      aria-label={`Editar ${t.name}`}
+                      className={iconActionClass()}
                     >
-                      Editar
+                      <IconActionGlyph icon={Pencil} />
                     </Link>
                     <ToggleActivaButton templateId={t.id} activa={t.is_active} />
                   </div>
@@ -63,15 +67,10 @@ export default async function EmailTemplatesPage() {
               </tr>
             ))}
             {(templates ?? []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-one-oscuro/40">
-                  Todavía no hay plantillas de email creadas.
-                </td>
-              </tr>
+              <TableEmptyRow colSpan={4}>Todavía no hay plantillas de email creadas.</TableEmptyRow>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

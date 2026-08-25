@@ -90,9 +90,16 @@ export function TemplateForm({
   const [html, setHtml] = useState(
     valoresIniciales?.html_content ?? (envioPersonalizadoPorDefecto ? HTML_BASE_ENVIO_PERSONALIZADO : HTML_BASE)
   );
-  const [variablesMeta, setVariablesMeta] = useState(
-    () => serializarDescripciones(valoresIniciales?.variables_schema ?? [])
-  );
+  // Ya no se edita desde acá (ver el input hidden más abajo) — se calcula
+  // una sola vez de lo que la plantilla ya tuviera guardado, para que ese
+  // dato viejo no se pierda en el próximo guardado.
+  const [variablesMeta] = useState(() => serializarDescripciones(valoresIniciales?.variables_schema ?? []));
+  // Plantillas grandes detectan 80-100+ variables — mostrarlas todas de
+  // una tapaba media pantalla de chips (2026-08-25, bug real reportado).
+  // Arranca colapsado a un par de filas; el botón "+N más" al final de
+  // la fila destapa el resto sin sacar nada de funcionalidad.
+  const [mostrarTodasLasVariables, setMostrarTodasLasVariables] = useState(false);
+  const LIMITE_VARIABLES_VISIBLES = 12;
   const variablesDetectadas = useMemo(() => {
     const detectadas = extraerVariablesDeHtml(html);
     try {
@@ -249,7 +256,10 @@ export function TemplateForm({
                   por campaña.
                 </span>
               )}
-              {variablesDetectadas.map((v) => (
+              {(mostrarTodasLasVariables
+                ? variablesDetectadas
+                : variablesDetectadas.slice(0, LIMITE_VARIABLES_VISIBLES)
+              ).map((v) => (
                 <span
                   key={v.key}
                   title={v.description ? `${v.label} — ${v.description}` : v.label}
@@ -262,29 +272,28 @@ export function TemplateForm({
                   {'{{' + v.key + '}}'}
                 </span>
               ))}
+              {variablesDetectadas.length > LIMITE_VARIABLES_VISIBLES && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarTodasLasVariables((v) => !v)}
+                  className="rounded-full bg-one-oscuro/5 px-2.5 py-0.5 text-xs font-semibold text-one-oscuro/60 transition-colors duration-150 hover:bg-one-oscuro/10 hover:text-one-oscuro"
+                >
+                  {mostrarTodasLasVariables
+                    ? 'Mostrar menos'
+                    : `+${variablesDetectadas.length - LIMITE_VARIABLES_VISIBLES} más`}
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="mt-4">
-            <label className={labelClass} htmlFor="variables_meta">
-              Descripciones de variables (JSON, opcional)
-            </label>
-            <textarea
-              id="variables_meta"
-              name="variables_meta"
-              rows={4}
-              value={variablesMeta}
-              onChange={(e) => setVariablesMeta(e.target.value)}
-              placeholder={'{\n  "precio_plan_1": { "label": "Precio del plan 1", "descripcion": "Con formato $X.XXX" }\n}'}
-              className={`${inputClass} font-mono text-xs`}
-            />
-            <p className="mt-1 text-xs text-one-oscuro/40">
-              Pegá acá el bloque B que te devuelve el prompt de arriba — para cada variable, qué
-              contenido/formato va ahí. Es opcional: sin esto la variable igual funciona, solo que el
-              prompt de campaña va a mostrar el nombre de la clave nomás, sin explicación. Los chips en
-              verde de arriba ya tienen descripción cargada.
-            </p>
-          </div>
+          {/* Sacado de esta pantalla (2026-08-25, pedido explícito) — describir
+              QUÉ va en cada variable es una decisión de campaña, no de
+              plantilla: acá solo importa qué {{clave}} existen (los chips de
+              arriba), no su contenido. Sigue viajando como campo oculto para
+              no perder en el próximo guardado la descripción que una
+              plantilla ya tuviera cargada de antes — simplemente ya no se
+              edita desde acá. */}
+          <input type="hidden" name="variables_meta" value={variablesMeta} />
         </div>
 
         {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}

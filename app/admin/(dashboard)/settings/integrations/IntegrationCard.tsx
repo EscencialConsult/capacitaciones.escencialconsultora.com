@@ -2,8 +2,9 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { CheckCircle2, CircleOff, ChevronDown } from 'lucide-react';
+import { CheckCircle2, CircleOff, ChevronDown, KeyRound, Unplug } from 'lucide-react';
 import { inputClass, labelClass } from '../../FormInput';
+import { iconActionClass, IconActionGlyph } from '../../IconAction';
 
 type EstadoAccion = { error?: string; ok?: true };
 type AccionConectar = (prevState: EstadoAccion | undefined, formData: FormData) => Promise<EstadoAccion>;
@@ -118,19 +119,23 @@ export function IntegrationCard({
           {mostrarExito && !mostrarForm && (
             <p className="mt-2 text-xs font-medium text-emerald-600">Clave guardada y validada correctamente.</p>
           )}
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex items-center gap-2">
             <button
               type="button"
+              title="Actualizar clave"
+              aria-label={`Actualizar clave de ${proveedor}`}
               onClick={() => {
                 setMostrarForm((v) => !v);
                 setMostrarExito(false);
               }}
-              className="text-sm font-semibold text-one-fucsia transition-colors duration-150 hover:underline"
+              className={iconActionClass()}
             >
-              Actualizar clave
+              <IconActionGlyph icon={KeyRound} />
             </button>
             <button
               type="button"
+              title="Desconectar"
+              aria-label={`Desconectar ${proveedor}`}
               disabled={desconectando}
               onClick={async () => {
                 if (!confirm(`¿Desconectar ${proveedor}? Los envíos que dependan de esta clave van a dejar de funcionar hasta que conectes otra.`)) return;
@@ -143,9 +148,9 @@ export function IntegrationCard({
                   setDesconectando(false);
                 }
               }}
-              className="text-sm font-semibold text-one-oscuro/50 transition-colors duration-150 hover:text-one-rojo disabled:opacity-50"
+              className={iconActionClass('peligro')}
             >
-              {desconectando ? 'Desconectando...' : 'Desconectar'}
+              <IconActionGlyph icon={Unplug} busy={desconectando} />
             </button>
           </div>
         </div>

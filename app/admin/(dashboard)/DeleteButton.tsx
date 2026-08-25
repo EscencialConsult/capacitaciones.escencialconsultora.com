@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert, Trash2 } from 'lucide-react';
+import { iconActionClass, IconActionGlyph } from './IconAction';
 
 /**
  * Botonera de eliminar compartida por landings/plantillas/campañas/usuarios —
@@ -44,13 +45,15 @@ export function DeleteButton({
     <>
       <button
         type="button"
+        title="Eliminar"
+        aria-label={`Eliminar ${itemLabel}`}
         onClick={() => {
           setError(null);
           setOpen(true);
         }}
-        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-rojo"
+        className={iconActionClass('peligro')}
       >
-        Eliminar
+        <IconActionGlyph icon={Trash2} />
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-one-oscuro/60 p-4 backdrop-blur-sm">

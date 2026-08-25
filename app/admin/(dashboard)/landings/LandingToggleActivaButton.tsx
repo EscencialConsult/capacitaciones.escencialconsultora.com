@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Play, CircleOff } from 'lucide-react';
 import { toggleLandingActive } from './actions';
+import { iconActionClass, IconActionGlyph } from '../IconAction';
 
 export function LandingToggleActivaButton({
   landingId,
@@ -25,11 +27,14 @@ export function LandingToggleActivaButton({
   // prendemos antes del await y lo apagamos en el finally.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const label = activa ? 'Desactivar' : 'Activar';
 
   return (
     <div className="inline-flex items-center gap-2">
       <button
         type="button"
+        title={label}
+        aria-label={label}
         disabled={busy}
         onClick={() => {
           setError(null);
@@ -49,9 +54,9 @@ export function LandingToggleActivaButton({
             }
           });
         }}
-        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-fucsia disabled:pointer-events-none disabled:opacity-50"
+        className={iconActionClass(activa ? 'peligro' : 'neutro')}
       >
-        {busy ? (activa ? 'Desactivando...' : 'Activando...') : activa ? 'Desactivar' : 'Activar'}
+        <IconActionGlyph icon={activa ? CircleOff : Play} busy={busy} />
       </button>
       {error && (
         <span className="rounded-one-sm bg-one-rojo/10 px-2 py-1 text-xs font-medium text-one-rojo">{error}</span>
