@@ -14,29 +14,28 @@ export default async function EmailTemplatesPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-extrabold text-one-oscuro">Plantillas de email</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Plantillas de email</h1>
         <Link
           href="/admin/email-templates/new"
-          prefetch={false}
-          className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
+          className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-one-fucsia"
         >
           + Nueva plantilla
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-oscuro/5">
+      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
         <table className="w-full text-sm">
-          <thead className="text-left text-one-oscuro/50">
+          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
             <tr>
-              <th className="px-4 py-3 font-semibold">Nombre</th>
-              <th className="px-4 py-3 font-semibold">Estado</th>
-              <th className="px-4 py-3 font-semibold">Actualizada</th>
-              <th className="px-4 py-3 font-semibold"></th>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Actualizada</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {(templates ?? []).map((t) => (
-              <tr key={t.id} className="border-t border-one-oscuro/5">
+              <tr key={t.id} className="table-row-hover border-t border-one-oscuro/5">
                 <td className="px-4 py-3 font-semibold text-one-oscuro">{t.name}</td>
                 <td className="px-4 py-3">
                   <span
@@ -54,8 +53,7 @@ export default async function EmailTemplatesPage() {
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/admin/email-templates/${t.id}/edit`}
-                      prefetch={false}
-                      className="text-one-fucsia hover:underline"
+                      className="text-sm font-semibold text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia"
                     >
                       Editar
                     </Link>

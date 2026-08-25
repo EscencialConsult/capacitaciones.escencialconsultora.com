@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { EnviarPendientesButton } from './EnviarPendientesButton';
 import { LandingToggleActivaButton } from './LandingToggleActivaButton';
+import { deleteLanding } from './actions';
+import { DeleteButton } from '../DeleteButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +17,14 @@ export default async function LandingsPage() {
 
   const { data: landings } = await supabase
     .from('landings')
-    .select('id, slug, name, is_active, landing_categories(name), landing_templates(name), campaigns(id, name, status)')
+    .select('id, slug, name, is_active, landing_templates(name), campaigns(id, name, status)')
     .order('created_at', { ascending: false });
 
   return (
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-extrabold text-one-oscuro">Landings</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Landings</h1>
           <p className="mt-1 text-sm text-one-oscuro/60">
             El link público en sí — el contenido y los leads viven en la campaña conectada, ver
             Campañas.
@@ -32,51 +34,47 @@ export default async function LandingsPage() {
           <EnviarPendientesButton />
           <Link
             href="/admin/landings/new"
-            prefetch={false}
-            className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
+            className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-one-fucsia"
           >
             + Nueva landing
           </Link>
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-oscuro/5">
+      <div className="mt-6 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
         <table className="w-full text-sm">
-          <thead className="text-left text-one-oscuro/50">
+          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
             <tr>
-              <th className="px-4 py-3 font-semibold">Link</th>
-              <th className="px-4 py-3 font-semibold">Nombre</th>
-              <th className="px-4 py-3 font-semibold">Categoría</th>
-              <th className="px-4 py-3 font-semibold">Plantilla</th>
-              <th className="px-4 py-3 font-semibold">Estado</th>
-              <th className="px-4 py-3 font-semibold">Campaña conectada</th>
-              <th className="px-4 py-3 font-semibold"></th>
+              <th className="px-4 py-3">Link</th>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Plantilla</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Campaña conectada</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {(landings ?? []).map((l) => {
-              const categoria = l.landing_categories as unknown as { name: string } | null;
               const plantilla = l.landing_templates as unknown as { name: string } | null;
               const campanas = (l.campaigns as unknown as { id: string; name: string; status: string }[]) ?? [];
               const campanaActiva = campanas.find((c) => c.status === 'active');
               return (
-                <tr key={l.id} className="border-t border-one-oscuro/5">
+                <tr key={l.id} className="table-row-hover border-t border-one-oscuro/5">
                   <td className="px-4 py-3">
                     <a
                       href={`/${l.slug}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-one-fucsia hover:underline"
+                      className="font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
                     >
                       /{l.slug}
                     </a>
                   </td>
                   <td className="px-4 py-3 text-one-oscuro">{l.name}</td>
-                  <td className="px-4 py-3 text-one-oscuro/60">{categoria?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-one-oscuro/60">{plantilla?.name ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      className={`inline-flex items-center rounded-one-sm px-2 py-0.5 text-xs font-semibold ${
                         l.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/50'
                       }`}
                     >
@@ -87,8 +85,7 @@ export default async function LandingsPage() {
                     {campanaActiva ? (
                       <Link
                         href={`/admin/campaigns/${campanaActiva.id}/leads`}
-                        prefetch={false}
-                        className="text-one-fucsia hover:underline"
+                        className="text-one-oscuro/70 transition-colors duration-150 hover:text-one-fucsia hover:underline"
                       >
                         {campanaActiva.name}
                       </Link>
@@ -100,12 +97,16 @@ export default async function LandingsPage() {
                     <div className="flex items-center gap-3">
                       <Link
                         href={`/admin/landings/${l.id}/edit`}
-                        prefetch={false}
-                        className="text-one-fucsia hover:underline"
+                        className="text-sm font-medium text-one-oscuro/50 transition-colors duration-150 hover:text-one-fucsia"
                       >
                         Editar
                       </Link>
-                      <LandingToggleActivaButton landingId={l.id} activa={l.is_active} />
+                      <LandingToggleActivaButton
+                        landingId={l.id}
+                        activa={l.is_active}
+                        tieneCampanaActiva={!!campanaActiva}
+                      />
+                      <DeleteButton itemLabel={`la landing "${l.name}"`} onDelete={deleteLanding.bind(null, l.id)} />
                     </div>
                   </td>
                 </tr>
@@ -113,7 +114,7 @@ export default async function LandingsPage() {
             })}
             {(landings ?? []).length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-one-oscuro/40">
+                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
                   Todavía no hay ninguna landing creada. Creá la primera para arrancar.
                 </td>
               </tr>

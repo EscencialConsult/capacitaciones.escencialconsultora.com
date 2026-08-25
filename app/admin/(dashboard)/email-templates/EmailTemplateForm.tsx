@@ -12,7 +12,7 @@ function BotonGuardar({ texto }: { texto: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-one-fucsia disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? 'Guardando...' : texto}
     </button>
@@ -26,14 +26,32 @@ export function EmailTemplateForm({
 }: {
   action: Accion;
   botonTexto: string;
-  valoresIniciales?: { name: string; html_content: string; is_active: boolean };
+  valoresIniciales?: {
+    name: string;
+    html_content: string;
+    is_active: boolean;
+    // Para el control de concurrencia optimista de updateEmailTemplate —
+    // el valor tal cual vino de la base al abrir el formulario, viaja de
+    // vuelta como input hidden para que el servidor pueda detectar si
+    // alguien más guardó esta plantilla mientras tanto.
+    updated_at?: string;
+  };
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const [html, setHtml] = useState(valoresIniciales?.html_content ?? '');
 
   return (
     <form action={formAction} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="space-y-4">
+      {/* Control de concurrencia optimista — ver actions.ts (updateEmailTemplate).
+          Solo tiene valor en edición; en "Nueva plantilla" viaja vacío y
+          el servidor ni lo mira porque ese flujo no pasa por updateEmailTemplate. */}
+      {valoresIniciales?.updated_at && (
+        <input type="hidden" name="expected_updated_at" defaultValue={valoresIniciales.updated_at} />
+      )}
+      <div
+        style={{ '--stagger-index': 0 } as React.CSSProperties}
+        className="stagger-in space-y-4 rounded-one-lg bg-one-blanco p-6 shadow-one-sm ring-1 ring-one-oscuro/5"
+      >
         <FormInput id="name" name="name" label="Nombre" required defaultValue={valoresIniciales?.name} />
 
         <div>
@@ -76,10 +94,13 @@ export function EmailTemplateForm({
         <BotonGuardar texto={botonTexto} />
       </div>
 
-      <div>
+      <div
+        style={{ '--stagger-index': 1 } as React.CSSProperties}
+        className="stagger-in rounded-one-lg bg-one-blanco p-6 shadow-one-sm ring-1 ring-one-oscuro/5"
+      >
         <p className={labelClass}>Vista previa en vivo</p>
         <div
-          className="mt-1 overflow-hidden rounded-one-md border border-one-oscuro/10"
+          className="mt-2 overflow-hidden rounded-one-md border border-one-oscuro/10"
           style={{ height: 600 }}
         >
           <iframe title="Vista previa" srcDoc={html} className="h-full w-full" sandbox="" />

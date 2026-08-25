@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { NewCategoryModal } from './NewCategoryModal';
 import { CopyPromptButton } from './CopyPromptButton';
 import {
   HTML_BASE,
+  HTML_BASE_ENVIO_PERSONALIZADO,
   extraerVariablesDeHtml,
   combinarVariables,
   MARCAS,
@@ -27,7 +27,6 @@ function serializarDescripciones(schema: VariableSchema[]): string {
   return JSON.stringify(obj, null, 2);
 }
 
-type Categoria = { id: string; name: string };
 type Accion = (prevState: { error?: string } | undefined, formData: FormData) => Promise<{ error?: string } | undefined>;
 
 function BotonGuardar({ texto }: { texto: string }) {
@@ -36,7 +35,7 @@ function BotonGuardar({ texto }: { texto: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-one-fucsia disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? 'Guardando...' : texto}
     </button>
@@ -45,25 +44,52 @@ function BotonGuardar({ texto }: { texto: string }) {
 
 export function TemplateForm({
   action,
-  categorias,
   botonTexto,
   valoresIniciales,
+  campanasConectadas = 0,
+  envioPersonalizadoPorDefecto = false,
 }: {
   action: Accion;
-  categorias: Categoria[];
   botonTexto: string;
   valoresIniciales?: {
     name: string;
-    category_id: string | null;
     marca: Marca | null;
     html_content: string;
     variables_schema: VariableSchema[] | null;
     is_active: boolean;
+    envio_personalizado: boolean;
+    // Para el control de concurrencia optimista de updateTemplate — el
+    // valor tal cual vino de la base al abrir el formulario, viaja de
+    // vuelta como input hidden para que el servidor pueda detectar si
+    // alguien más guardó esta plantilla mientras tanto.
+    updated_at?: string;
   };
+  // Cuántas campañas dependen de esta plantilla hoy (a través de sus
+  // landings) — 0 en "Nueva plantilla", siempre. Con más de 0, el HTML
+  // queda de solo lectura: cambiar los {{clave}} de una plantilla en
+  // uso deja huérfano el contenido que esas campañas ya tenían cargado
+  // con los nombres viejos (ver updateTemplate, que lo re-valida server
+  // side — esto acá es solo para no dejar ni escribir en el textarea).
+  campanasConectadas?: number;
+  // Solo para "Nueva plantilla" (sin valoresIniciales) — si venís del
+  // botón "+ Nueva plantilla" de la pestaña "Envío personalizado", el
+  // checkbox arranca ya marcado en vez de que lo tengas que tildar vos.
+  envioPersonalizadoPorDefecto?: boolean;
 }) {
+  const bloqueada = campanasConectadas > 0;
+  // Solo se ofrece el control si ya venís del apartado de envío
+  // personalizado (creando una nueva desde esa pestaña) o si estás
+  // editando una que ya es de ese tipo — nunca aparece en el flujo
+  // normal de "Nueva plantilla".
+  const mostrarEnvioPersonalizado = envioPersonalizadoPorDefecto || (valoresIniciales?.envio_personalizado ?? false);
   const [state, formAction] = useFormState(action, undefined);
   const [marca, setMarca] = useState<Marca | ''>(valoresIniciales?.marca ?? '');
-  const [html, setHtml] = useState(valoresIniciales?.html_content ?? HTML_BASE);
+  const [envioPersonalizado, setEnvioPersonalizado] = useState(
+    valoresIniciales?.envio_personalizado ?? envioPersonalizadoPorDefecto
+  );
+  const [html, setHtml] = useState(
+    valoresIniciales?.html_content ?? (envioPersonalizadoPorDefecto ? HTML_BASE_ENVIO_PERSONALIZADO : HTML_BASE)
+  );
   const [variablesMeta, setVariablesMeta] = useState(
     () => serializarDescripciones(valoresIniciales?.variables_schema ?? [])
   );
@@ -78,60 +104,19 @@ export function TemplateForm({
       return detectadas;
     }
   }, [html, variablesMeta]);
-  const [listaCategorias, setListaCategorias] = useState(categorias);
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
-  const [modalAbierto, setModalAbierto] = useState(false);
-
   return (
     <form action={formAction} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="space-y-4">
+      {/* Control de concurrencia optimista — ver actions.ts (updateTemplate).
+          Solo tiene valor en edición; en "Nueva plantilla" viaja vacío y
+          el servidor ni lo mira porque ese flujo no pasa por updateTemplate. */}
+      {valoresIniciales?.updated_at && (
+        <input type="hidden" name="expected_updated_at" defaultValue={valoresIniciales.updated_at} />
+      )}
+      <div
+        style={{ '--stagger-index': 0 } as React.CSSProperties}
+        className="stagger-in space-y-4 rounded-one-lg bg-one-blanco p-6 shadow-one-sm ring-1 ring-one-oscuro/5"
+      >
         <FormInput id="name" name="name" label="Nombre" required defaultValue={valoresIniciales?.name} />
-
-        <div>
-          <div className="flex items-center justify-between">
-            <label className={labelClass} htmlFor="category_id">
-              Categoría
-            </label>
-            <button
-              type="button"
-              onClick={() => setModalAbierto(true)}
-              className="text-xs text-one-fucsia hover:underline"
-            >
-              ¿No está la que buscás? Crear categoría nueva
-            </button>
-          </div>
-          <select
-            id="category_id"
-            name="category_id"
-            value={categoriaSeleccionada}
-            onChange={(e) => setCategoriaSeleccionada(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">— Sin categoría —</option>
-            {listaCategorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {listaCategorias.length === 0 && (
-            <p className="mt-1 text-xs text-one-dorado">
-              Todavía no hay ninguna categoría creada — podés dejar esto sin elegir y crear una con el
-              botón de arriba.
-            </p>
-          )}
-        </div>
-
-        {modalAbierto && (
-          <NewCategoryModal
-            onClose={() => setModalAbierto(false)}
-            onCreated={(categoria) => {
-              setListaCategorias((prev) => [...prev, categoria]);
-              setCategoriaSeleccionada(categoria.id);
-              setModalAbierto(false);
-            }}
-          />
-        )}
 
         <div>
           <label className={labelClass} htmlFor="marca">
@@ -172,21 +157,76 @@ export function TemplateForm({
           </select>
         </div>
 
+        {/* Exclusivo del apartado "Envío personalizado" (2026-08-24,
+            pedido de Facundo): en el flujo normal de "Nueva plantilla"
+            esto ni se muestra — solo aparece si ya venís de esa pestaña
+            (envioPersonalizadoPorDefecto, ver templates/new/page.tsx →
+            ?tipo=personalizado) o si estás editando una plantilla que
+            ya es de este tipo. Nunca se ofrece como una opción más
+            dentro de la creación de una plantilla común. */}
+        {mostrarEnvioPersonalizado && (
+          <div>
+            <label className={`flex items-center gap-2 text-sm font-semibold text-one-oscuro ${bloqueada ? 'cursor-not-allowed opacity-50' : ''}`}>
+              <input
+                type="checkbox"
+                id="envio_personalizado"
+                name="envio_personalizado"
+                value="true"
+                checked={envioPersonalizado}
+                // Los checkbox no soportan readOnly (a diferencia de un
+                // <input type="text">) — nunca lo pongo "disabled" porque
+                // eso lo saca por completo del FormData al enviar, y el
+                // servidor interpretaría "no vino" como false, pisando un
+                // true existente en silencio. En vez de eso, cuando está
+                // bloqueada simplemente ignoro el click (el estado
+                // controlado lo devuelve a como estaba, así sigue
+                // mandando su valor real de siempre) — el bloqueo posta
+                // lo hace el servidor en updateTemplate, mismo criterio
+                // que ya usa para html_content.
+                onChange={(e) => {
+                  if (bloqueada) return;
+                  setEnvioPersonalizado(e.target.checked);
+                }}
+                className="size-4 rounded border-one-oscuro/30 accent-one-fucsia focus:ring-2 focus:ring-one-fucsia/20"
+              />
+              Envío personalizado
+            </label>
+            <p className="mt-1 text-xs text-one-oscuro/40">
+              El lead elige una de 4 opciones al registrarse, y eso decide cuál de los 4 emails de
+              la campaña se le manda al instante — en vez del goteo normal de días. Cambia el HTML
+              base (agrega un selector al formulario), así que{' '}
+              {bloqueada
+                ? 'quedó bloqueado por las mismas campañas conectadas de arriba.'
+                : 'no se va a poder tocar una vez que esta plantilla tenga campañas conectadas.'}
+            </p>
+          </div>
+        )}
+
         <div>
           <div className="flex items-center justify-between">
             <label className={labelClass} htmlFor="html_content">
               HTML de la plantilla
             </label>
-            <CopyPromptButton marca={marca || null} />
+            <CopyPromptButton marca={marca || null} envioPersonalizado={envioPersonalizado} />
           </div>
+          {bloqueada && (
+            <p className="mb-2 rounded-one-sm bg-one-dorado/10 px-3 py-2 text-xs text-one-oscuro/70">
+              Esta plantilla tiene {campanasConectadas} campaña{campanasConectadas === 1 ? '' : 's'}{' '}
+              conectada{campanasConectadas === 1 ? '' : 's'} — el HTML quedó de solo lectura. Cambiar los{' '}
+              {'{{clave}}'} de una plantilla en uso deja huérfano el contenido que esas campañas ya
+              tenían cargado con los nombres viejos. Si necesitás otro diseño, creá una plantilla nueva
+              (nombre, marca y estado sí se pueden guardar acá).
+            </p>
+          )}
           <textarea
             id="html_content"
             name="html_content"
             required
+            readOnly={bloqueada}
             rows={16}
             value={html}
             onChange={(e) => setHtml(e.target.value)}
-            className={`${inputClass} font-mono text-xs`}
+            className={`${inputClass} font-mono text-xs ${bloqueada ? 'cursor-not-allowed bg-one-oscuro/5 text-one-oscuro/50' : ''}`}
           />
           <p className="mt-1 text-xs text-one-oscuro/40">
             HTML/CSS/JS autocontenido, sin React ni Tailwind (ni ningún framework por CDN — la landing
@@ -252,10 +292,13 @@ export function TemplateForm({
         <BotonGuardar texto={botonTexto} />
       </div>
 
-      <div>
+      <div
+        style={{ '--stagger-index': 1 } as React.CSSProperties}
+        className="stagger-in rounded-one-lg bg-one-blanco p-6 shadow-one-sm ring-1 ring-one-oscuro/5"
+      >
         <p className={labelClass}>Vista previa en vivo</p>
         <div
-          className="mt-1 overflow-hidden rounded-one-md border border-one-oscuro/10"
+          className="mt-2 overflow-hidden rounded-one-md border border-one-oscuro/10"
           style={{ height: 600 }}
         >
           <iframe title="Vista previa" srcDoc={html} className="h-full w-full" sandbox="" />

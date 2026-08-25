@@ -50,6 +50,12 @@ export async function middleware(request: NextRequest) {
   // además de la que ya hace este middleware, y era la causa real de la
   // lentitud entre pantallas.
   request.headers.set('x-user-email', user.email ?? '');
+  // Mismo criterio para el ícono de perfil (2026-08-24, ver Avatar.tsx) —
+  // ya tenemos `user` acá con user_metadata incluido, así que agregar
+  // este header es gratis (no una llamada de red nueva), a diferencia de
+  // volver a pedirlo en el layout.
+  const avatar = (user.user_metadata as { avatar?: string } | null)?.avatar;
+  request.headers.set('x-user-avatar', avatar ?? '');
 
   const response = NextResponse.next({ request });
   cookiesParaRefrescar.forEach(({ name, value, options }) =>

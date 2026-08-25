@@ -35,9 +35,18 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
 
   const { data: landing, error } = await supabase
     .from('landings')
-    .select('id, is_active, landing_templates(html_content)')
+    .select('id, is_active, is_test, landing_templates(html_content)')
     .eq('slug', params.slug)
     .single();
+
+  if (error) {
+    // Esto es un fallo real de la consulta (timeout, RLS mal configurada,
+    // columna renombrada), no un simple "no existe" — si no se loguea acá,
+    // en producción es indistinguible de un visitante con un link mal
+    // tipeado, y un corte de Supabase haría 404ear a TODAS las landings
+    // públicas sin dejar rastro en los logs del servidor.
+    console.error('[GET /[slug]] Error al consultar landing:', error);
+  }
 
   if (error || !landing || !landing.is_active) {
     return new NextResponse('Landing no encontrada.', { status: 404 });
@@ -48,12 +57,18 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     return new NextResponse('Esta landing no tiene plantilla asignada.', { status: 500 });
   }
 
-  const { data: campana } = await supabase
+  const { data: campana, error: campanaError } = await supabase
     .from('campaigns')
     .select('variables')
     .eq('landing_id', landing.id)
     .eq('status', 'active')
     .maybeSingle();
+
+  if (campanaError) {
+    // Mismo caso que arriba: sin este log, un fallo real de la consulta a
+    // `campaigns` se ve igual que "todavía no hay campaña activa".
+    console.error('[GET /[slug]] Error al consultar campaña activa:', campanaError);
+  }
 
   if (!campana) {
     return new NextResponse('Esta landing todavía no tiene ninguna campaña activa conectada.', {
@@ -68,6 +83,23 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   });
 
   return new NextResponse(html, {
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      // force-dynamic evita que Next.js cachee esto en el servidor, pero
+      // no le dice nada al NAVEGADOR — sin este header, Chrome puede
+      // servir una copia vieja de /slug desde su caché de disco en una
+      // visita posterior (hasta en una pestaña nueva), mostrando
+      // contenido/variables de antes de la última campaña guardada.
+      // Esta página cambia con cada campaña activada/editada, así que
+      // nunca puede quedar cacheada en ningún lado.
+      'Cache-Control': 'no-store, must-revalidate',
+      // Sin esto, una landing marcada is_test (armada solo para mostrarle
+      // un diseño a un cliente, no una campaña real) queda tan indexable
+      // como cualquier otra — Google la rastrea igual y semanas después
+      // puede aparecer en resultados de búsqueda confundiéndose con la
+      // landing definitiva del mismo cliente. ver migración
+      // 0013_landing_is_test.sql y LandingForm.tsx para dónde se marca.
+      ...(landing.is_test ? { 'X-Robots-Tag': 'noindex' } : {}),
+    },
   });
 }

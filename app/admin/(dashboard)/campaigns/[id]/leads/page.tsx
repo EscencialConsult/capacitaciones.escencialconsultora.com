@@ -7,9 +7,17 @@ export const dynamic = 'force-dynamic';
 // Un color + un ícono por estado real de envío — no decorativo, cada uno
 // representa un dato real. El ícono existe para que no haga falta pasar
 // el mouse ni conocer el código de color para saber si un email salió.
+// Paleta ceñida a DESIGN.md (nunca amber/sky, no son colores de esta marca):
+// emerald = éxito, one-dorado = "todavía no, pero no es un error", one-cian
+// = acento secundario para el estado transitorio "enviando ahora".
 const estiloEtapa: Record<string, string> = {
   sent: 'bg-emerald-50 text-emerald-600',
-  pending: 'bg-amber-50 text-amber-600',
+  pending: 'bg-one-dorado/15 text-one-dorado',
+  // 'processing' = reclamado por process-pending.ts pero todavía no confirmó
+  // el envío en Brevo (ver supabase/migrations/0010_email_sends_processing_status.sql).
+  // Es una ventana corta, pero si la fila queda huérfana ahí, esto evita
+  // que se vea como "pendiente todavía" (que confundiría al admin).
+  processing: 'bg-one-cian/15 text-one-cian',
   error: 'bg-one-rojo/10 text-one-rojo',
   skipped: 'bg-one-oscuro/5 text-one-oscuro/40',
   no_aplica: 'bg-one-oscuro/5 text-one-oscuro/25',
@@ -18,6 +26,7 @@ const estiloEtapa: Record<string, string> = {
 const iconoEtapa: Record<string, typeof Check> = {
   sent: Check,
   pending: Clock,
+  processing: Clock,
   error: X,
   skipped: Minus,
   no_aplica: Minus,
@@ -26,6 +35,7 @@ const iconoEtapa: Record<string, typeof Check> = {
 const etiquetaEtapa: Record<string, string> = {
   sent: 'enviado',
   pending: 'pendiente todavía',
+  processing: 'enviando ahora',
   error: 'falló el envío',
   skipped: 'salteado',
   no_aplica: 'no aplica',
@@ -42,7 +52,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
   const [{ data: campana }, { data: pasos }, { data: leads }] = await Promise.all([
     supabase
       .from('campaigns')
-      .select('id, name, status, landings(name, slug, landing_templates(name))')
+      .select('id, name, status, landings(name, slug, landing_templates(name, envio_personalizado))')
       .eq('id', params.id)
       .single(),
     supabase
@@ -53,7 +63,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
     supabase
       .from('leads')
       .select(
-        'id, first_name, last_name, email, phone, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(status, scheduled_for, landing_email_step_id)'
+        'id, first_name, last_name, email, phone, selected_option, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(status, scheduled_for, landing_email_step_id)'
       )
       .eq('campaign_id', params.id)
       .order('created_at', { ascending: false }),
@@ -62,20 +72,29 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
   const landing = campana?.landings as unknown as {
     name: string;
     slug: string;
-    landing_templates: { name: string } | null;
+    landing_templates: { name: string; envio_personalizado: boolean } | null;
   } | null;
   const pasosConfigurados = pasos ?? [];
   const estaActiva = campana?.status === 'active';
+  // Campaña de envío personalizado (ver landing_templates.envio_personalizado
+  // y app/api/leads/route.ts) — el lead elige una opción y le llega SOLO ese
+  // email, no el goteo de 4. Acá se usa para mostrar qué opción eligió cada
+  // uno y poder auditar contra pasosConfigurados.
+  const esEnvioPersonalizado = landing?.landing_templates?.envio_personalizado ?? false;
+  const numerosConfigurados = new Set(pasosConfigurados.map((p) => p.step_number));
 
   return (
     <div>
-      <Link href="/admin/campaigns" prefetch={false} className="text-sm text-one-fucsia hover:underline">
+      <Link
+        href="/admin/campaigns"
+        className="rounded-one-sm text-sm font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+      >
         ← Volver a campañas
       </Link>
-      <h1 className="mt-2 flex items-center gap-2 text-lg font-extrabold text-one-oscuro">
+      <h1 className="mt-2 flex flex-wrap items-center gap-3 text-2xl font-extrabold tracking-tight text-one-oscuro">
         Leads — {campana?.name ?? '...'}
         <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
             estaActiva ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/50'
           }`}
         >
@@ -110,7 +129,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
           <Check className="size-3.5 text-emerald-600" strokeWidth={3} /> enviado
         </span>
         <span className="inline-flex items-center gap-1">
-          <Clock className="size-3.5 text-amber-600" strokeWidth={2.5} /> todavía no (pendiente)
+          <Clock className="size-3.5 text-one-dorado" strokeWidth={2.5} /> todavía no (pendiente)
         </span>
         <span className="inline-flex items-center gap-1">
           <X className="size-3.5 text-one-rojo" strokeWidth={3} /> falló
@@ -120,20 +139,21 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
         </span>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-one-lg bg-one-oscuro/5">
+      <div className="mt-4 overflow-hidden rounded-one-lg bg-one-blanco shadow-one-sm ring-1 ring-one-oscuro/5">
         <table className="w-full text-sm">
-          <thead className="text-left text-one-oscuro/50">
+          <thead className="text-left text-xs font-semibold tracking-wide text-one-oscuro/50 uppercase">
             <tr>
-              <th className="px-4 py-3 font-semibold">Nombre</th>
-              <th className="px-4 py-3 font-semibold">Email</th>
-              <th className="px-4 py-3 font-semibold">Teléfono</th>
-              <th className="px-4 py-3 font-semibold">Click WhatsApp</th>
-              <th className="px-4 py-3 font-semibold">Etapas de email</th>
-              <th className="px-4 py-3 font-semibold">Ingresó</th>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Teléfono</th>
+              <th className="px-4 py-3">Click WhatsApp</th>
+              {esEnvioPersonalizado && <th className="px-4 py-3">Opción elegida</th>}
+              <th className="px-4 py-3">Etapas de email</th>
+              <th className="px-4 py-3">Ingresó</th>
             </tr>
           </thead>
           <tbody>
-            {(leads ?? []).map((lead) => {
+            {(leads ?? []).map((lead, i) => {
               const sends = (lead.email_sends as EmailSend[]) ?? [];
               // Por cada paso CONFIGURADO en la campaña (no por cada envío
               // que exista) — así si un lead entró antes de que se agregara
@@ -144,7 +164,11 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                 return { numero: paso.step_number, estado: envio?.status ?? 'no_aplica', fecha: envio?.scheduled_for };
               });
               return (
-                <tr key={lead.id} className="border-t border-one-oscuro/5">
+                <tr
+                  key={lead.id}
+                  style={{ '--stagger-index': i } as React.CSSProperties}
+                  className="stagger-in table-row-hover border-t border-one-oscuro/5"
+                >
                   <td className="px-4 py-3 text-one-oscuro">
                     {lead.first_name} {lead.last_name}
                   </td>
@@ -165,6 +189,25 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                       <span className="text-one-oscuro/40">Todavía no</span>
                     )}
                   </td>
+                  {esEnvioPersonalizado && (
+                    <td className="px-4 py-3">
+                      {lead.selected_option == null ? (
+                        <span className="text-one-oscuro/40">—</span>
+                      ) : numerosConfigurados.has(lead.selected_option) ? (
+                        <span className="text-one-oscuro">{lead.selected_option}</span>
+                      ) : (
+                        // El lead eligió esta opción pero nunca se cargó un
+                        // email para ese step_number — no se le mandó nada
+                        // y sin esta alerta quedaba invisible en el panel.
+                        <span
+                          title="El lead eligió esta opción, pero no hay ningún email configurado para ese número de etapa — nunca se le mandó nada."
+                          className="inline-flex w-fit items-center gap-1 rounded-full bg-one-rojo/10 px-2 py-0.5 text-xs font-semibold text-one-rojo"
+                        >
+                          {lead.selected_option} — sin email configurado
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {etapas.map((e) => {
@@ -172,7 +215,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                         return (
                           <span
                             key={e.numero}
-                            title={`Etapa ${e.numero}: ${etiquetaEtapa[e.estado]}${
+                            title={`Etapa ${e.numero}: ${etiquetaEtapa[e.estado] ?? e.estado}${
                               e.fecha ? ' — ' + new Date(e.fecha).toLocaleString('es-AR') : ''
                             }`}
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${estiloEtapa[e.estado] ?? ''}`}
@@ -193,7 +236,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
             })}
             {(leads ?? []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-one-oscuro/40">
+                <td colSpan={esEnvioPersonalizado ? 7 : 6} className="px-4 py-8 text-center text-one-oscuro/40">
                   Todavía no hay leads en esta campaña.
                 </td>
               </tr>

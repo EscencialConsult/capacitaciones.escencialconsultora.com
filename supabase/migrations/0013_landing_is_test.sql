@@ -1,0 +1,14 @@
+-- Landings de prueba no deben ser indexables por Google.
+--
+-- Hasta acá cualquier landing con is_active=true era 100% indexable, sin
+-- distinción entre una campaña real y una landing armada solo para
+-- mostrarle un diseño a un cliente (ej. 'PRUEBA-cliente-x'). Google la
+-- rastreaba igual que a cualquier campaña definitiva y semanas después
+-- podía aparecer en resultados de búsqueda, compitiendo o confundiéndose
+-- con la landing real del mismo cliente.
+--
+-- is_test permite marcar esas landings de prueba a mano desde el admin;
+-- app/[slug]/route.ts la usa para devolver 'X-Robots-Tag: noindex' en la
+-- respuesta cuando está en true. Default false: ninguna landing existente
+-- cambia de comportamiento con este backfill.
+alter table landings add column is_test boolean not null default false;

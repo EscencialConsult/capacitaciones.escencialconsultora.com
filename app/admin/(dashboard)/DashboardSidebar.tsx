@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug } from 'lucide-react';
+import { Avatar } from './Avatar';
 
 const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
 
@@ -15,18 +16,22 @@ const NAV = [
   { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate },
   { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
+  { href: '/admin/settings/integrations', label: 'Integraciones', icon: Plug },
 ];
 
 // Mecánica clonada 1:1 de DashboardSidebar.jsx (COMRURAL): estado persistido
 // en localStorage, logo con fade cruzado (no swap de src), handle propio en
 // el borde ADEMÁS del logo como toggle (redundante a propósito), timing
 // compartido entre <aside>, label de texto e ítem de nav — ver globals.css.
-export function DashboardSidebar() {
+export function DashboardSidebar({ avatar, email }: { avatar: string | null; email: string | null }) {
   const pathname = usePathname();
   const [colapsado, setColapsado] = useState(false);
   const [montado, setMontado] = useState(false);
 
-  useEffect(() => {
+  // useLayoutEffect (no useEffect) para leer la preferencia guardada ANTES de
+  // que el navegador pinte: evita el flash de sidebar expandido -> colapsado
+  // en cada F5 o carga dura cuando el usuario ya lo tenía colapsado.
+  useLayoutEffect(() => {
     setColapsado(localStorage.getItem(CLAVE_COLAPSADO) === 'true');
     setMontado(true);
   }, []);
@@ -89,7 +94,6 @@ export function DashboardSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={false}
                 className={linkClass(!!activo)}
                 title={colapsado ? item.label : undefined}
               >
@@ -99,6 +103,19 @@ export function DashboardSidebar() {
             );
           })}
         </nav>
+
+        <Link
+          href="/admin/profile"
+          title={colapsado ? 'Mi perfil' : undefined}
+          className={`sidebar-navitem mt-2 flex items-center gap-3 rounded-one-sm border-t border-one-blanco/10 py-3 text-one-lavanda hover:bg-one-blanco/5 hover:text-one-blanco ${
+            colapsado ? 'is-colapsado justify-center' : ''
+          }`}
+        >
+          <Avatar avatar={avatar} email={email} size="sm" />
+          <span className={`sidebar-label truncate text-sm font-medium ${colapsado ? 'is-oculto' : ''}`}>
+            {email ?? 'Mi perfil'}
+          </span>
+        </Link>
       </aside>
 
       <button

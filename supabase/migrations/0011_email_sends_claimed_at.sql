@@ -1,0 +1,15 @@
+-- Bug real confirmado (2026-08-24, Ronda 3) — el reclamo pending→processing
+-- que agregó la migración 0010 (para evitar el doble envío por Brevo) no
+-- tenía ningún mecanismo que lo deshaga: si processPendingEmails() moría
+-- entre el UPDATE de reclamo y el UPDATE final (sent o error) — timeout de
+-- la Netlify function, deploy en medio de una corrida, crash de Node — esa
+-- fila quedaba en 'processing' para siempre. El .eq('status', 'pending')
+-- que arma la lista de trabajo nunca la vuelve a traer, y no hay ningún
+-- otro job/cron/botón en el sistema que reintente una fila 'processing'
+-- vieja. 'processing' huérfano es estrictamente peor que el 'pending'
+-- original: ese se reintentaba solo.
+--
+-- claimed_at guarda CUÁNDO se reclamó cada fila, para poder distinguir
+-- "se está mandando ahora mismo" de "quedó pegada hace rato" y liberarla
+-- de vuelta a 'pending' en el arranque de la próxima corrida.
+alter table email_sends add column claimed_at timestamptz;

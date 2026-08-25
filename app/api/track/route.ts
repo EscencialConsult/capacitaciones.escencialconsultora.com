@@ -57,7 +57,12 @@ export async function GET(request: Request) {
 
   const numero = campana?.whatsapp_number ?? '';
   const mensaje = campana?.whatsapp_message ?? '';
-  const urlWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+  // encodeURIComponent también en el número (2026-08-24, Ronda 2) — hoy
+  // campaignSchema ya valida que sea solo dígitos (8 a 15) para campañas
+  // nuevas, pero una campaña vieja guardada antes de esa validación
+  // podía tener espacios/"+"/guiones, que rompían la URL de wa.me sin
+  // avisar en ningún lado del flujo.
+  const urlWhatsapp = `https://wa.me/${encodeURIComponent(numero)}?text=${encodeURIComponent(mensaje)}`;
 
   return NextResponse.redirect(urlWhatsapp);
 }

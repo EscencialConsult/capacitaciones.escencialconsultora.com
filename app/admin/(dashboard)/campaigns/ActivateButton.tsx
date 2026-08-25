@@ -3,28 +3,56 @@
 import { useState, useTransition } from 'react';
 import { activateCampaign } from './actions';
 
-export function ActivateButton({ campaignId, slug }: { campaignId: string; slug: string }) {
-  const [pending, startTransition] = useTransition();
+export function ActivateButton({
+  campaignId,
+  slug,
+  label = 'Activar',
+}: {
+  campaignId: string;
+  slug: string;
+  /** "Activar" para una en borrador, "Reactivar" para una pausada — mismo botón, mismo action. */
+  label?: string;
+}) {
+  const [, startTransition] = useTransition();
+  // Booleano manual en vez de depender de `pending` de useTransition: `pending`
+  // se apaga apenas el callback async cruza el primer await (comportamiento
+  // documentado de React), mucho antes de que activateCampaign() termine en
+  // el servidor. Acá el confirm() nativo bloquea el hilo antes de cada
+  // intento (no permite un doble click inmediato), pero mientras la primera
+  // petición sigue en vuelo un segundo click abre otro confirm() encima sin
+  // avisar que ya hay una en curso — confuso aunque no corrompe datos.
+  // `busy` sí cubre la duración real del pedido porque lo prendemos antes
+  // del await y lo apagamos en el finally.
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="inline-flex items-center gap-2">
       <button
         type="button"
-        disabled={pending}
+        disabled={busy}
         onClick={() => {
           setError(null);
-          if (!confirm(`¿Activar esta campaña? A partir de ahora /${slug} va a mostrar su contenido de verdad.`)) {
+          if (!confirm(`¿${label} esta campaña? A partir de ahora /${slug} va a mostrar su contenido de verdad.`)) {
             return;
           }
+          setBusy(true);
           startTransition(async () => {
-            const r = await activateCampaign(campaignId);
-            if (r?.error) setError(r.error);
+            try {
+              const r = await activateCampaign(campaignId);
+              if (r?.error) setError(r.error);
+            } catch {
+              // La Server Action rechazó (corte de red, timeout) en vez de devolver
+              // {error} — no sabemos si el cambio llegó a impactar en el servidor.
+              setError('No se pudo confirmar si se activó — recargá la página para chequear el estado real antes de reintentar.');
+            } finally {
+              setBusy(false);
+            }
           });
         }}
-        className="rounded-full bg-one-fucsia px-4 py-1.5 text-xs font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+        className="rounded-full border border-one-fucsia/30 bg-one-fucsia/5 px-4 py-1.5 text-xs font-bold text-one-fucsia transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/15 hover:shadow-one-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 disabled:pointer-events-none disabled:opacity-60"
       >
-        {pending ? 'Activando...' : 'Activar'}
+        {busy ? `${label === 'Reactivar' ? 'Reactivando' : 'Activando'}...` : label}
       </button>
       {error && <span className="text-xs text-one-rojo">{error}</span>}
     </div>

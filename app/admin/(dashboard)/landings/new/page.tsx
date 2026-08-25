@@ -7,20 +7,16 @@ export const dynamic = 'force-dynamic';
 export default async function NewLandingPage() {
   const supabase = createSupabaseServiceClient();
 
-  const [{ data: categorias }, { data: templates }] = await Promise.all([
-    supabase.from('landing_categories').select('id, name').order('name'),
-    supabase.from('landing_templates').select('id, name').eq('is_active', true).order('name'),
-  ]);
+  const { data: templates } = await supabase
+    .from('landing_templates')
+    .select('id, name, envio_personalizado')
+    .eq('is_active', true)
+    .order('name');
 
   return (
     <div>
-      <h1 className="text-lg font-extrabold text-one-oscuro">Nueva landing</h1>
-      <LandingForm
-        action={createLanding}
-        categorias={categorias ?? []}
-        templates={templates ?? []}
-        botonTexto="Crear landing"
-      />
+      <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Nueva landing</h1>
+      <LandingForm key="new" action={createLanding} templates={templates ?? []} botonTexto="Crear landing" />
     </div>
   );
 }

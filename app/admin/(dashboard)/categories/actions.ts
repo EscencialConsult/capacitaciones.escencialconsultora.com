@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 
 // Rango Unicode U+0300-U+036F (diacríticos combinantes que aparecen tras
 // normalize('NFD')), armado con codepoints numéricos a propósito — nada
@@ -35,6 +35,10 @@ const schema = z.object({
  * la página ni perder lo que ya se había tipeado en el resto del form.
  */
 export async function createCategory(_prevState: { error?: string } | undefined, formData: FormData) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
   const parsed = schema.safeParse({ name: formData.get('name') });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
 

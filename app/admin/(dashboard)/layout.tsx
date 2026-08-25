@@ -13,13 +13,24 @@ import { DashboardHeader } from './DashboardHeader';
 // la lentitud entre pantallas, no el diseño).
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const email = headers().get('x-user-email');
+  const avatar = headers().get('x-user-avatar') || null;
 
   return (
-    <div className="flex min-h-svh bg-one-blanco">
-      <DashboardSidebar />
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <DashboardHeader email={email} />
-        <main className="mx-auto w-full max-w-6xl px-6 py-8">{children}</main>
+    // .admin-glow (ver globals.css) — dos manchas de color fixed detrás de
+    // todo, opacidad muy baja; bg-one-dots es la grilla de puntos sutil del
+    // mismo criterio que la textura de fondo de las landings públicas. Un
+    // único elemento reutilizado por TODA la zona /admin, no por página —
+    // primer load liviano (solo CSS, nada de JS ni imagen), consistente con
+    // el resto del shell (sidebar/header ya viven acá, no por pantalla).
+    <div className="admin-glow relative flex min-h-svh overflow-hidden bg-one-blanco">
+      <div className="relative z-10 flex w-full">
+        <DashboardSidebar avatar={avatar} email={email} />
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          <DashboardHeader email={email} avatar={avatar} />
+          <main className="relative mx-auto w-full max-w-6xl flex-1 bg-one-dots bg-one-dots-size bg-fixed px-6 py-8">
+            <div className="relative">{children}</div>
+          </main>
+        </div>
       </div>
     </div>
   );

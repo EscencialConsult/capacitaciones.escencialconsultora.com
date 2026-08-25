@@ -9,7 +9,7 @@ export default async function EditEmailTemplatePage({ params }: { params: { id: 
   const supabase = createSupabaseServiceClient();
   const { data: template } = await supabase
     .from('email_templates')
-    .select('id, name, html_content, is_active')
+    .select('id, name, html_content, is_active, updated_at')
     .eq('id', params.id)
     .single();
 
@@ -19,7 +19,7 @@ export default async function EditEmailTemplatePage({ params }: { params: { id: 
 
   return (
     <div>
-      <h1 className="text-lg font-extrabold text-one-oscuro">Editar plantilla — {template.name}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Editar plantilla — {template.name}</h1>
       <EmailTemplateForm action={accionConId} botonTexto="Guardar cambios" valoresIniciales={template} />
     </div>
   );

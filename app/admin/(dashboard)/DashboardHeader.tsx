@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Search, LogOut } from 'lucide-react';
 import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users } from 'lucide-react';
 import { signOut } from '../login/actions';
+import { Avatar } from './Avatar';
 
 const ITEMS_BUSCABLES = [
   { id: 'inicio', nombre: 'Inicio', ruta: '/admin', icon: LayoutDashboard },
@@ -25,15 +27,34 @@ function normalizar(texto: string) {
 // Header clonado de DashboardHeader.jsx (COMRURAL) — buscador que filtra
 // los mismos ítems del sidebar y navega, más el pill de usuario y logout.
 // Sin clima/notificaciones: esas features no existen en esta plataforma.
-export function DashboardHeader({ email }: { email: string | null }) {
+export function DashboardHeader({ email, avatar }: { email: string | null; avatar: string | null }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState('');
   const [enfocado, setEnfocado] = useState(false);
+  const buscadorRef = useRef<HTMLDivElement>(null);
 
   const resultados = busqueda.trim()
     ? ITEMS_BUSCABLES.filter((item) => normalizar(item.nombre).includes(normalizar(busqueda)))
     : [];
   const abierto = enfocado && busqueda.trim().length > 0;
+
+  // Cierra el panel al clickear afuera del buscador. Antes había un overlay
+  // fixed inset-0 que, al no tener ningún ancestro con z-index propio, se
+  // dibujaba por encima de TODO el documento (incluido el propio input y el
+  // resto del header/sidebar) y se comía el primer click de cualquier cosa
+  // que no fuera el panel de resultados.
+  useEffect(() => {
+    if (!abierto) return;
+
+    function alClickearAfuera(e: MouseEvent) {
+      if (buscadorRef.current && !buscadorRef.current.contains(e.target as Node)) {
+        setEnfocado(false);
+      }
+    }
+
+    document.addEventListener('mousedown', alClickearAfuera);
+    return () => document.removeEventListener('mousedown', alClickearAfuera);
+  }, [abierto]);
 
   const irAResultado = (ruta: string) => {
     router.push(ruta);
@@ -41,14 +62,16 @@ export function DashboardHeader({ email }: { email: string | null }) {
     setEnfocado(false);
   };
 
-  const inicial = (email ?? 'A').charAt(0).toUpperCase();
-
   return (
     <header className="flex items-center gap-4 border-b border-one-oscuro/10 bg-one-blanco px-6 py-4">
-      <div className="relative mx-auto w-full max-w-md">
-        <div className="flex items-center gap-2 rounded-full bg-one-oscuro/5 px-4 py-2 text-sm text-one-oscuro/70 transition-colors duration-200 focus-within:bg-one-oscuro/10">
+      <div ref={buscadorRef} className="relative mx-auto w-full max-w-md">
+        <label htmlFor="admin-search" className="sr-only">
+          Buscar en el panel
+        </label>
+        <div className="flex items-center gap-2 rounded-full bg-one-oscuro/5 px-4 py-2 text-sm text-one-oscuro/70 transition-colors duration-200 focus-within:bg-one-oscuro/10 focus-within:ring-2 focus-within:ring-one-fucsia/20">
           <Search className="size-4 shrink-0 text-one-oscuro/40" strokeWidth={1.75} />
           <input
+            id="admin-search"
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
@@ -68,43 +91,42 @@ export function DashboardHeader({ email }: { email: string | null }) {
         </div>
 
         {abierto && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setEnfocado(false)} />
-            <div className="search-panel absolute top-full left-0 z-50 mt-2 w-full rounded-one-md bg-one-blanco p-2 ring-1 ring-one-oscuro/10">
-              {resultados.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-one-oscuro/40">
-                  Sin resultados para &quot;{busqueda}&quot;.
-                </p>
-              ) : (
-                <ul className="flex flex-col">
-                  {resultados.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => irAResultado(item.ruta)}
-                        className="flex w-full items-center gap-3 rounded-one-sm px-3 py-2 text-left text-sm text-one-oscuro/80 transition-colors duration-150 hover:bg-one-fucsia/5"
-                      >
-                        <item.icon className="size-4 text-one-oscuro/40" strokeWidth={1.75} />
-                        {item.nombre}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </>
+          <div className="search-panel absolute top-full left-0 z-50 mt-2 w-full rounded-one-md bg-one-blanco p-2 shadow-one-lg ring-1 ring-one-oscuro/10">
+            {resultados.length === 0 ? (
+              <p className="px-3 py-4 text-center text-xs text-one-oscuro/40">
+                Sin resultados para &quot;{busqueda}&quot;.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {resultados.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => irAResultado(item.ruta)}
+                      className="flex w-full items-center gap-3 rounded-one-sm px-3 py-2 text-left text-sm text-one-oscuro/80 transition-colors duration-150 hover:bg-one-fucsia/5"
+                    >
+                      <item.icon className="size-4 text-one-oscuro/40" strokeWidth={1.75} />
+                      {item.nombre}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="flex items-center gap-2 pl-2">
-        <div className="flex size-9 items-center justify-center rounded-full bg-one-fucsia/15 text-sm font-bold text-one-fucsia">
-          {inicial}
-        </div>
+      <Link
+        href="/admin/profile"
+        title="Mi perfil"
+        className="flex items-center gap-2 rounded-full pl-2 transition-colors duration-150 hover:bg-one-oscuro/5"
+      >
+        <Avatar avatar={avatar} email={email} />
         <div className="hidden text-left sm:block">
           <p className="text-sm leading-tight font-semibold text-one-oscuro">{email ?? 'Admin'}</p>
           <p className="text-xs leading-tight text-one-oscuro/50">Administrador</p>
         </div>
-      </div>
+      </Link>
 
       <form action={signOut}>
         <button

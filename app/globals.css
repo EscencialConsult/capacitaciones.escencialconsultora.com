@@ -99,3 +99,114 @@
     transition-duration: 1ms;
   }
 }
+
+/* ── Rediseño del panel admin (2026-08-24) ──────────────────────────
+   Sistema compartido por TODAS las pantallas de /admin — fila
+   (glow de fondo, stagger de listas, shimmer del loading) para que el
+   "más de un 100% de mejora" pedido sea un sistema, no un parche por
+   pantalla. Nada de esto pesa en el bundle de JS: son solo CSS,
+   respetan prefers-reduced-motion, y el fondo (.admin-glow) es un
+   único elemento fixed reutilizado por layout.tsx en vez de repetirse
+   por página — primer load liviano, nada que "calentar" para que
+   ande rápido después. */
+
+/* Fondo del shell admin — dos manchas de color ancladas en esquinas
+   opuestas (mismo criterio que la textura de las landings públicas:
+   fixed, position detrás de todo, opacidad muy baja) + la grilla de
+   puntos de tailwind.config.ts (bg-one-dots). No se mueve con el
+   scroll: es ambiente, no decoración de una sección puntual. */
+.admin-glow::before,
+.admin-glow::after {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  width: 520px;
+  height: 520px;
+  border-radius: 9999px;
+  filter: blur(120px);
+  pointer-events: none;
+}
+.admin-glow::before {
+  top: -160px;
+  right: -160px;
+  background: rgba(225, 123, 215, 0.14); /* one-fucsia */
+}
+.admin-glow::after {
+  bottom: -200px;
+  left: -160px;
+  background: rgba(107, 225, 227, 0.12); /* one-cian */
+}
+
+/* Entrada escalonada de listas/grids (tarjetas de stats, filas de
+   tabla) — mismo timing/easing que .rise-in, con un delay creciente
+   por posición vía --stagger-index (seteado inline en cada ítem).
+   Sensación de "un solo gesto ordenado", no que cada fila aparezca
+   por separado sin relación con las demás. */
+.stagger-in {
+  animation: rise-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--stagger-index, 0) * 40ms);
+}
+
+/* Fila de tabla con acento a la izquierda en hover — reemplaza el
+   hover plano (bg gris) por una señal más precisa de "esta fila", sin
+   sombra ni glow (ver skill anti-ia: el tratamiento fuerte se reserva
+   para lo que lo amerita, una fila de tabla no es eso). */
+.table-row-hover {
+  position: relative;
+  transition: background-color 150ms ease-out;
+}
+.table-row-hover::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--one-fucsia, #e17bd7);
+  transform: scaleY(0);
+  transition: transform 150ms ease-out;
+}
+.table-row-hover:hover {
+  background-color: rgba(26, 24, 29, 0.025);
+}
+.table-row-hover:hover::before {
+  transform: scaleY(1);
+}
+
+/* Shimmer del loading.tsx — barrido de brillo sobre los bloques grises
+   en vez de solo animate-pulse (opacidad subiendo/bajando, que se
+   siente más "placeholder roto" que "cargando de verdad"). Anima
+   `transform` en vez de `background-position` a propósito: transform
+   corre en el compositor de la GPU, no dispara repaint en cada frame
+   (background-position sí) — barato incluso en el primer render, antes
+   de que haya nada en caché. */
+@keyframes one-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(26, 24, 29, 0.06);
+}
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(26, 24, 29, 0.08), transparent);
+  animation: one-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-in {
+    animation: none;
+  }
+  .skeleton-shimmer {
+    animation: none;
+  }
+}

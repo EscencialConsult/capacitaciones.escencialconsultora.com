@@ -3,13 +3,19 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { HTML_EMAIL_BASE } from '@/lib/landing-template-defaults';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre.'),
   html_content: z.string().min(1, 'Falta el HTML.'),
   is_active: z.enum(['true', 'false']),
+  // Control de concurrencia optimista (solo se usa en updateEmailTemplate):
+  // el updated_at que la plantilla tenía en el momento en que se abrió
+  // este formulario (ver email-templates/[id]/edit/page.tsx). Viaja como
+  // input hidden — "Nueva plantilla" no lo manda porque ahí no hay nada
+  // previo con qué comparar. Mismo patrón que templates/actions.ts.
+  expected_updated_at: z.string().trim().optional(),
 });
 
 function parse(formData: FormData) {
@@ -18,10 +24,17 @@ function parse(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' } as const;
   return {
     data: { name: parsed.data.name, html_content: parsed.data.html_content, is_active: parsed.data.is_active === 'true' },
+    // Aparte de "data" a propósito: no es una columna que se escriba,
+    // solo se usa para el chequeo de concurrencia en updateEmailTemplate.
+    expectedUpdatedAt: parsed.data.expected_updated_at || null,
   } as const;
 }
 
 export async function createEmailTemplate(_prevState: { error?: string } | undefined, formData: FormData) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
   const parsed = parse(formData);
   if ('error' in parsed) return { error: parsed.error };
 
@@ -41,10 +54,41 @@ export async function updateEmailTemplate(
   _prevState: { error?: string } | undefined,
   formData: FormData
 ) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
   const parsed = parse(formData);
   if ('error' in parsed) return { error: parsed.error };
 
   const supabase = createSupabaseServiceClient();
+
+  const { data: actual, error: actualError } = await supabase
+    .from('email_templates')
+    .select('updated_at')
+    .eq('id', templateId)
+    .single();
+
+  // Si no pudimos traer el estado actual, no sabemos contra qué comparar
+  // — fallamos cerrado (bloqueamos el guardado) en vez de asumir que no
+  // hay nada que proteger. Mismo criterio que updateTemplate.
+  if (actualError || !actual) {
+    console.error('Error leyendo estado actual de la plantilla de email:', actualError);
+    return { error: 'No se pudo verificar el estado actual de la plantilla, probá de nuevo.' };
+  }
+
+  // Control de concurrencia optimista: si el updated_at que el formulario
+  // tenía cargado al abrirse ya no coincide con el que está guardado
+  // ahora, alguien más (otro admin, otra pestaña) guardó esta plantilla
+  // después de que se abrió este formulario — sin este chequeo, este
+  // guardado pisaría en silencio ese cambio ajeno con datos viejos.
+  if (parsed.expectedUpdatedAt !== actual.updated_at) {
+    return {
+      error:
+        'Esta plantilla se editó desde otra pestaña después de que abriste esta — recargá (F5) y volvé a aplicar tus cambios.',
+    };
+  }
+
   const { error } = await supabase
     .from('email_templates')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -73,6 +117,10 @@ const schemaInline = z.object({
  * más elaborado, esto es solo para no bloquearlo en el momento.
  */
 export async function createEmailTemplateInline(_prevState: { error?: string } | undefined, formData: FormData) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
   const parsed = schemaInline.safeParse({ name: formData.get('name') });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
 
@@ -94,6 +142,10 @@ export async function createEmailTemplateInline(_prevState: { error?: string } |
 }
 
 export async function toggleEmailTemplateActive(templateId: string, activar: boolean) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
   const supabase = createSupabaseServiceClient();
   await supabase.from('email_templates').update({ is_active: activar }).eq('id', templateId);
   revalidatePath('/admin/email-templates');

@@ -11,21 +11,22 @@ export default async function NewCampaignPage() {
     await Promise.all([
       supabase
         .from('landings')
-        .select('id, slug, name, landing_templates(name, variables_schema)')
+        .select('id, slug, name, landing_templates(name, variables_schema, envio_personalizado)')
         .order('name'),
       supabase.from('email_templates').select('id, name').eq('is_active', true).order('name'),
-      supabase.from('landing_templates').select('id, name').eq('is_active', true).order('name'),
+      supabase.from('landing_templates').select('id, name, envio_personalizado').eq('is_active', true).order('name'),
       supabase.from('landing_categories').select('id, name').order('name'),
     ]);
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-lg font-extrabold text-one-oscuro">Nueva campaña</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Nueva campaña</h1>
       <p className="mt-1 text-sm text-one-oscuro/60">
         Queda en borrador — todavía sin servir contenido. Elegí a qué landing se conecta, cargá
         todo, y cuando esté listo activala desde la lista de Campañas.
       </p>
       <CampaignForm
+        key="new"
         landings={(landings ?? []) as unknown as LandingConPlantilla[]}
         emailTemplates={emailTemplates ?? []}
         templatesParaNuevaLanding={templates ?? []}

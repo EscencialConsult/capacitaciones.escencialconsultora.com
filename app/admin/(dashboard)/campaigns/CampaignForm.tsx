@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
+import { Link2, Sparkles, FileText, UserRound } from 'lucide-react';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { NewEmailTemplateModal } from './NewEmailTemplateModal';
 import { NewLandingModal } from './NewLandingModal';
+import { NewCategoryModal } from '../templates/NewCategoryModal';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
 type VariableSchema = { key: string; label: string; type: 'text' | 'textarea'; description?: string };
@@ -12,7 +15,7 @@ export type LandingConPlantilla = {
   id: string;
   slug: string;
   name: string;
-  landing_templates: { name: string; variables_schema: VariableSchema[] | null } | null;
+  landing_templates: { name: string; variables_schema: VariableSchema[] | null; envio_personalizado: boolean } | null;
 };
 type EmailPlantilla = { id: string; name: string };
 type Accion = (
@@ -31,6 +34,7 @@ type PasoExistente = {
 type ValoresIniciales = {
   name: string;
   landing_id: string;
+  category_id: string | null;
   advisor_name: string | null;
   whatsapp_number: string | null;
   whatsapp_message: string | null;
@@ -38,13 +42,20 @@ type ValoresIniciales = {
   pasos: PasoExistente[];
 };
 
+const PASOS = [
+  { n: 1, label: 'Landing y datos' },
+  { n: 2, label: 'Prompt IA' },
+  { n: 3, label: 'Contenido' },
+  { n: 4, label: 'Asesora y emails' },
+] as const;
+
 function BotonGuardar({ texto, textoPendiente }: { texto: string; textoPendiente: string }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+      className="rounded-full bg-one-fucsia px-6 py-2.5 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-one-fucsia focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? textoPendiente : texto}
     </button>
@@ -57,25 +68,82 @@ function BloqueEmail({
   emailTemplates,
   valores,
   onCrearDiseno,
+  envioPersonalizado,
+  campoOpcion,
+  landingId,
 }: {
   numero: 1 | 2 | 3 | 4;
   obligatorio: boolean;
   emailTemplates: EmailPlantilla[];
   valores?: PasoExistente;
   onCrearDiseno: (numero: 1 | 2 | 3 | 4) => void;
+  // Plantilla con envio_personalizado=true (ver landing_templates) — el
+  // lead elige una opción 1-4 en el formulario público, y SOLO ese
+  // email se manda, al instante. Cambia nada más la presentación de
+  // este bloque (título y el campo de días, que en este modo no se usa
+  // — ver app/api/leads/route.ts): los datos que se guardan (asunto,
+  // contenido, diseño) son los mismos campos step{N}_* de siempre.
+  envioPersonalizado: boolean;
+  // El campo de contenido opcion_N_texto (el texto que ve el LEAD para
+  // elegir esta opción en el <select> público) — se muestra acá, junto
+  // al email que le corresponde, en vez de suelto entre el resto de las
+  // variables del paso 3 (ver el comentario en CampaignForm). Sigue
+  // siendo el mismo campo var_opcion_N_texto de siempre — mismo id,
+  // mismo name, solo cambia dónde se lo edita.
+  campoOpcion?: { key: string; label: string; defaultValue?: string };
+  // Solo se usa como `key` del campo de campoOpcion, más abajo — ver el
+  // comentario ahí. No se usa para nada más de este bloque a propósito
+  // (asunto/contenido/diseño de cada paso NO dependen de la landing
+  // elegida, así que no deben remontarse al cambiarla).
+  landingId: string;
 }) {
   return (
     <section className="rounded-one-lg bg-one-oscuro/5 p-5">
-      <h2 className="text-sm font-bold text-one-oscuro">
-        Email {numero} {obligatorio ? '(obligatorio)' : '(opcional)'}
-      </h2>
-      {!obligatorio && (
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-bold text-one-oscuro">
+          {envioPersonalizado ? `Opción ${numero}` : `Email ${numero}`}
+        </h2>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+            obligatorio ? 'bg-one-dorado/15 text-one-dorado' : 'bg-one-oscuro/5 text-one-oscuro/40'
+          }`}
+        >
+          {obligatorio ? 'Obligatorio' : 'Opcional'}
+        </span>
+      </div>
+      {envioPersonalizado ? (
         <p className="mt-1 text-xs text-one-oscuro/40">
-          Dejá asunto y contenido vacíos si no vas a usar este paso — se saltea solo, no hace falta
-          escribir nada de relleno.
+          Se manda al instante, solo si el lead elige esta opción en el formulario — nunca en
+          goteo por días.
         </p>
+      ) : (
+        !obligatorio && (
+          <p className="mt-1 text-xs text-one-oscuro/40">
+            Dejá asunto y contenido vacíos si no vas a usar este paso — se saltea solo, no hace
+            falta escribir nada de relleno.
+          </p>
+        )
       )}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_140px]">
+      {campoOpcion && (
+        // key={landingId}: sin esto, dos plantillas de envío
+        // personalizado (que SIEMPRE declaran el mismo key
+        // "opcion_N_texto" — es la convención, no una coincidencia)
+        // comparten el mismo nodo DOM al cambiar de landing en el paso
+        // 1, y React lo reutiliza en vez de remontarlo: el texto
+        // tipeado para la opción de la landing anterior queda pisando
+        // en silencio el campo de la landing nueva. Con la key, React
+        // descarta el nodo viejo y el nuevo arranca desde su
+        // defaultValue real.
+        <div className="mt-4" key={landingId}>
+          <FormInput
+            id={`var_${campoOpcion.key}`}
+            name={`var_${campoOpcion.key}`}
+            label={`${campoOpcion.label} — lo que ve el lead para elegir esta opción`}
+            defaultValue={campoOpcion.defaultValue}
+          />
+        </div>
+      )}
+      <div className={`mt-4 grid grid-cols-1 gap-4 ${envioPersonalizado ? '' : 'sm:grid-cols-[1fr_140px]'}`}>
         <div>
           <div className="flex items-center justify-between">
             <label className={labelClass} htmlFor={`step${numero}_email_template_id`}>
@@ -84,7 +152,7 @@ function BloqueEmail({
             <button
               type="button"
               onClick={() => onCrearDiseno(numero)}
-              className="text-xs text-one-fucsia hover:underline"
+              className="rounded-one-sm text-xs font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
             >
               + Crear diseño
             </button>
@@ -106,22 +174,37 @@ function BloqueEmail({
             ))}
           </select>
         </div>
-        <FormInput
-          id={`step${numero}_offset_days`}
-          name={`step${numero}_offset_days`}
-          label="Días después del ingreso"
-          type="number"
-          min={0}
-          defaultValue={valores?.offset_days ?? (numero === 1 ? 0 : '')}
-          placeholder="0"
-        />
+        {/* offset_days queda oculto (pero sigue mandándose en 0) en modo
+            envío personalizado — app/api/leads/route.ts lo ignora del
+            todo para este modo, así que mostrarlo confundiría más de lo
+            que ayuda. */}
+        {!envioPersonalizado && (
+          <FormInput
+            id={`step${numero}_offset_days`}
+            name={`step${numero}_offset_days`}
+            label="Días después del ingreso"
+            type="number"
+            min={0}
+            defaultValue={valores?.offset_days ?? (numero === 1 ? 0 : '')}
+            placeholder="0"
+          />
+        )}
+        {envioPersonalizado && (
+          <input type="hidden" name={`step${numero}_offset_days`} defaultValue={valores?.offset_days ?? 0} />
+        )}
       </div>
       <div className="mt-4">
+        {/* Sin "required" HTML5 a propósito (2026-08-14): con el form
+            dividido en pasos/tabs, un campo obligatorio escondido en un
+            paso que no se visitó bloquea el submit sin mostrar nada (el
+            navegador no puede posicionar su globo de validación sobre un
+            elemento con display:none). La validación real de "Email 1
+            obligatorio" ya la hace el servidor (ver campaignSchema en
+            actions.ts) y su mensaje aparece abajo del todo. */}
         <FormInput
           id={`step${numero}_subject`}
           name={`step${numero}_subject`}
           label="Asunto"
-          required={obligatorio}
           defaultValue={valores?.subject}
         />
       </div>
@@ -133,7 +216,6 @@ function BloqueEmail({
           id={`step${numero}_content`}
           name={`step${numero}_content`}
           rows={3}
-          required={obligatorio}
           defaultValue={valores?.content}
           className={inputClass}
         />
@@ -162,7 +244,7 @@ export function CampaignForm({
 }: {
   landings: LandingConPlantilla[];
   emailTemplates: EmailPlantilla[];
-  templatesParaNuevaLanding: { id: string; name: string }[];
+  templatesParaNuevaLanding: { id: string; name: string; envio_personalizado: boolean }[];
   categorias: { id: string; name: string }[];
   action: Accion;
   botonTexto: string;
@@ -171,6 +253,35 @@ export function CampaignForm({
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const pasoPorNumero = (n: number) => valoresIniciales?.pasos.find((p) => p.step_number === n);
+
+  // Pasos tipo wizard (2026-08-14, pedido de Facundo) — 100% libres, se
+  // puede saltar a cualquiera clickeando su número, ir y volver las
+  // veces que haga falta. No bloquean nada: es solo qué bloque del
+  // mismo <form> se ve, los demás siguen montados (ver className
+  // "hidden" más abajo) para no perder valores no controlados al
+  // cambiar de paso, y "Guardar cambios" queda disponible siempre, no
+  // solo en el último paso.
+  const [pasoActivo, setPasoActivo] = useState<1 | 2 | 3 | 4>(1);
+
+  // "¿Ya viste en vivo lo último que guardaste?" (2026-08-14, pedido de
+  // Facundo) — reemplaza el cartel verde separado que había antes: en
+  // vez de un aviso aparte, el botón "Visualizar landing" del paso 1 se
+  // pone rosa/con punto cuando hay algo sin chequear a ojo — recién
+  // guardado, o editado de nuevo después de guardar. Se apaga solo
+  // cuando clickeás ese mismo botón (asumimos que ahí vas a ir a mirar).
+  const [cambiosSinRevisar, setCambiosSinRevisar] = useState(false);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (searchParams.get('guardado') === '1') {
+      setCambiosSinRevisar(true);
+      setPasoActivo(1);
+      router.replace(pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Se levanta a estado local para poder agregarle al toque el diseño
   // que se cree desde el modal de acceso directo (botón "+ Crear
@@ -201,14 +312,52 @@ export function CampaignForm({
   // diferencia de los de diseño de email arriba), así que agregar una
   // landing nueva a la lista y dejarla elegida es un solo setState —
   // no hace falta el hack de useEffect diferido para este caso.
+  //
+  // IMPORTANTE (2026-08-14, bug real reportado por Facundo): en una
+  // campaña NUEVA (sin valoresIniciales) esto NO puede caer en
+  // "listaLandings[0]" como estaba antes — landings viene ordenado
+  // alfabéticamente (ver .order('name') en new/page.tsx), así que se
+  // preseleccionaba en silencio la primera landing del abecedario, con
+  // SU plantilla y SUS variables. Si el usuario no se daba cuenta y
+  // copiaba el prompt de una, el JSON que la IA devolvía traía las
+  // variables de una plantilla distinta a la que en realidad quería
+  // cargar — variables "genéricas" o de otro rubro que no coincidían
+  // con la landing real. Arranca vacío a propósito: obliga a elegir la
+  // landing a mano, así el prompt que se copia siempre es el de la
+  // landing que el usuario decidió, nunca uno que cayó ahí por orden
+  // alfabético.
   const [listaLandings, setListaLandings] = useState(landings);
-  const [landingId, setLandingId] = useState(valoresIniciales?.landing_id ?? listaLandings[0]?.id ?? '');
+  const [landingId, setLandingId] = useState(valoresIniciales?.landing_id ?? '');
   const [modalLandingAbierto, setModalLandingAbierto] = useState(false);
+
+  const [listaCategorias, setListaCategorias] = useState(categorias);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(valoresIniciales?.category_id ?? '');
+  const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false);
   const landingSeleccionada = useMemo(
     () => listaLandings.find((l) => l.id === landingId) ?? null,
     [listaLandings, landingId]
   );
   const variablesDeLaPlantilla = landingSeleccionada?.landing_templates?.variables_schema ?? [];
+  const esEnvioPersonalizado = landingSeleccionada?.landing_templates?.envio_personalizado ?? false;
+
+  // En envío personalizado, opcion_pregunta y opcion_N_texto son las
+  // únicas variables que un lead real llega a VER (son el texto del
+  // <select> del formulario público) — dejarlas sueltas en el paso 3,
+  // mezcladas con el resto del contenido, separaba visualmente "qué
+  // dice el botón/opción N" de "qué email manda la opción N" (paso 4),
+  // que es exactamente donde surgió la confusión: no quedaba claro que
+  // son la misma cosa vista desde dos lugares. Ahora se sacan del grid
+  // genérico del paso 3 y se muestran junto al email que le corresponde
+  // en el paso 4 — mismo campo `var_opcion_N_texto` de siempre, mismo
+  // valor que se guarda, solo cambia DÓNDE se lo ve.
+  const variableOpcionPregunta = esEnvioPersonalizado
+    ? variablesDeLaPlantilla.find((v) => v.key === 'opcion_pregunta')
+    : undefined;
+  const variableOpcionTexto = (numero: 1 | 2 | 3 | 4) =>
+    esEnvioPersonalizado ? variablesDeLaPlantilla.find((v) => v.key === `opcion_${numero}_texto`) : undefined;
+  const variablesPaso3 = esEnvioPersonalizado
+    ? variablesDeLaPlantilla.filter((v) => !/^opcion_(pregunta|[1-4]_texto)$/.test(v.key))
+    : variablesDeLaPlantilla;
 
   // Completar a mano campo por campo no es viable en plantillas ricas
   // (hero + beneficios + planes + FAQ pueden ser 40-60 variables), y
@@ -268,7 +417,9 @@ export function CampaignForm({
   // Al entrar a la pantalla (o al cambiar de landing, que cambia qué
   // variables existen) se refleja lo que ya está cargado — así el
   // cuadro nunca arranca vacío ni desactualizado, ni siquiera editando
-  // una campaña que ya tenía todo cargado de antes.
+  // una campaña que ya tenía todo cargado de antes. Esto NO cuenta como
+  // "cambio sin revisar" — es solo reflejar lo que ya había, no algo
+  // nuevo que el usuario acaba de tocar.
   useEffect(() => {
     sincronizarJson();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +429,7 @@ export function CampaignForm({
     const target = e.target as HTMLElement;
     if (target.id === 'json_campana') return;
     if (jsonPegado !== ultimoAutoSync.current) return; // hay algo pegado sin aplicar, no lo pisamos
+    setCambiosSinRevisar(true);
     if (syncTimeout.current) clearTimeout(syncTimeout.current);
     syncTimeout.current = setTimeout(sincronizarJson, 400);
   }
@@ -352,6 +504,7 @@ export function CampaignForm({
     // canónico del formulario (no lo que se pegó tal cual), así queda
     // sincronizado para lo que se siga tipeando de acá en más.
     sincronizarJson();
+    setCambiosSinRevisar(true);
 
     const nombreLanding = landingSeleccionada?.landing_templates?.name ?? 'la plantilla';
     if (faltantes.length > 0) {
@@ -377,218 +530,413 @@ export function CampaignForm({
 
   return (
     <>
-    <form action={formAction} onInput={alTipearEnElFormulario} className="mt-6 space-y-6">
-      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
-        <h2 className="text-sm font-bold text-one-oscuro">1. Elegí la landing</h2>
-        <p className="mt-1 text-xs text-one-oscuro/40">
-          El prompt del paso 2 depende de esta elección — cambia según qué variables tenga la
-          plantilla de esa landing. Si cambiás de landing acá, volvé a copiar el prompt.
-        </p>
-        <div className="mt-4">
-          <div className="flex items-center justify-between">
-            <label className={labelClass} htmlFor="landing_id">
-              Landing (link público)
-            </label>
+    <form action={formAction} onInput={alTipearEnElFormulario} className="mt-6">
+      {/* Indicador de progreso del wizard — círculo numerado (el único
+          elemento sólido en fucsia, chico y contenido, mismo criterio que
+          el anillo del Avatar) + línea conectora entre pasos. El tinte de
+          fondo del paso activo es SUAVE (one-fucsia/15, mismo idioma que
+          el ítem activo del sidebar en DESIGN.md), no sólido — el sólido
+          se reserva para "Guardar cambios", la única acción real de esta
+          pantalla (ver DESIGN.md → La Regla de la Rareza Fucsia). Los 4
+          pasos son 100% libres de visitar en cualquier orden (ver
+          comentario más abajo), así que no hay estado "completado" real
+          que mostrar — solo dónde estás parado ahora. */}
+      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+        {PASOS.map((p, idx) => (
+          <div key={p.n} className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              onClick={() => setModalLandingAbierto(true)}
-              className="text-xs text-one-fucsia hover:underline"
+              onClick={() => setPasoActivo(p.n)}
+              aria-current={pasoActivo === p.n ? 'step' : undefined}
+              className={`flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-1.5 text-sm font-bold transition-[background-color,color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 ${
+                pasoActivo === p.n
+                  ? 'bg-one-fucsia/15 text-one-fucsia'
+                  : 'text-one-oscuro/50 hover:bg-one-oscuro/5 hover:text-one-oscuro/80'
+              }`}
             >
-              + Crear landing nueva
-            </button>
-          </div>
-          <div className="flex items-stretch gap-2">
-            <select
-              id="landing_id"
-              name="landing_id"
-              required
-              value={landingId}
-              onChange={(e) => setLandingId(e.target.value)}
-              className={`${inputClass} flex-1`}
-            >
-              {!landingId && <option value="">Elegí una landing</option>}
-              {listaLandings.map((l) => (
-                <option key={l.id} value={l.id}>
-                  /{l.slug} — {l.name} — {l.landing_templates?.name ?? '—'}
-                </option>
-              ))}
-            </select>
-            {landingSeleccionada && (
-              <a
-                href={`/${landingSeleccionada.slug}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 flex items-center whitespace-nowrap rounded-one-sm border border-one-oscuro/15 px-4 text-sm font-bold text-one-oscuro transition-all duration-300 hover:bg-one-oscuro/5"
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-extrabold transition-colors duration-200 ease-out ${
+                  pasoActivo === p.n ? 'bg-one-fucsia text-one-negro' : 'bg-one-oscuro/10 text-one-oscuro/50'
+                }`}
               >
-                Visualizar landing ↗
-              </a>
+                {p.n}
+              </span>
+              <span>{p.n === 4 && esEnvioPersonalizado ? 'Asesora y opciones' : p.label}</span>
+            </button>
+            {idx < PASOS.length - 1 && (
+              <span className="hidden h-px w-4 shrink-0 bg-one-oscuro/10 sm:block sm:w-8" aria-hidden="true" />
             )}
           </div>
-          {listaLandings.length === 0 && (
-            <p className="mt-1 text-xs text-one-dorado">
-              Todavía no hay ninguna landing creada — usá el botón de arriba para crear la primera.
-            </p>
-          )}
-          {landingSeleccionada && (
-            <p className="mt-1 text-xs text-one-oscuro/40">
-              Abre /{landingSeleccionada.slug} tal cual está en vivo ahora mismo — si esta campaña
-              todavía no está activa, puede mostrar el contenido de otra campaña activa en esa
-              misma landing (o nada, si no hay ninguna).
-            </p>
-          )}
-        </div>
-      </section>
+        ))}
+      </div>
 
-      <div className="rounded-one-lg border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-5">
-        <h2 className="text-sm font-bold text-one-oscuro">
-          2. Copiá el prompt, pegalo en tu IA, y pegá acá lo que te devuelva
-        </h2>
-        <p className="mt-1 text-xs text-one-oscuro/40">
-          El prompt ya trae las {variablesDeLaPlantilla.length} variable(s) de "
-          {landingSeleccionada?.landing_templates?.name ?? 'la plantilla elegida'}
-          " — la IA te va a devolver un JSON con todas esas claves completas. Pegalo abajo y
-          "Completar formulario" enchufa todo de una (opcional, también podés cargar todo a mano).
-          Este cuadro también funciona al revés: siempre muestra lo que ya está cargado en el
-          formulario de más abajo, así nunca se pierde — se actualiza solo apenas tipeás algo ahí.
-        </p>
-        <div className="mt-3 flex items-center justify-between">
-          <label className={labelClass} htmlFor="json_campana">
-            JSON (reflejo en vivo de lo cargado — pegá acá para reemplazarlo)
-          </label>
-          <CopyLandingPromptButton variables={variablesDeLaPlantilla} />
-        </div>
-        <textarea
-          id="json_campana"
-          rows={4}
-          value={jsonPegado}
-          onChange={(e) => setJsonPegado(e.target.value)}
-          placeholder={'{\n  "name": "...",\n  "advisor_name": "...",\n  "variables": { "titulo": "..." },\n  "emails": [{ "step": 1, "offset_days": 0, "subject": "...", "content": "..." }]\n}'}
-          className={`${inputClass} font-mono text-xs`}
-        />
-        <div className="mt-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={aplicarJson}
-            className="rounded-full bg-one-fucsia px-4 py-1.5 text-xs font-bold text-one-negro transition-all duration-300 hover:-translate-y-0.5"
-          >
-            Completar formulario
-          </button>
-          {mensajeJson && (
-            <span className={`text-xs ${mensajeJson.tipo === 'ok' ? 'text-emerald-600' : 'text-one-rojo'}`}>
-              {mensajeJson.texto}
-            </span>
-          )}
+      <div className={`mt-6 space-y-6 ${pasoActivo === 1 ? '' : 'hidden'}`}>
+        <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-one-oscuro">
+            <Link2 className="size-4 text-one-oscuro/40" strokeWidth={2} />
+            1. Elegí la landing
+          </h2>
+          <p className="mt-1 text-xs text-one-oscuro/40">
+            El prompt del paso 2 depende de esta elección — cambia según qué variables tenga la
+            plantilla de esa landing. Si cambiás de landing acá, volvé a copiar el prompt.
+          </p>
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <label className={labelClass} htmlFor="landing_id">
+                Landing (link público)
+              </label>
+              <button
+                type="button"
+                onClick={() => setModalLandingAbierto(true)}
+                className="rounded-one-sm text-xs font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+              >
+                + Crear landing nueva
+              </button>
+            </div>
+            <div className="flex items-stretch gap-2">
+              <select
+                id="landing_id"
+                name="landing_id"
+                value={landingId}
+                onChange={(e) => setLandingId(e.target.value)}
+                className={`${inputClass} flex-1`}
+              >
+                {!landingId && <option value="">Elegí una landing</option>}
+                {listaLandings.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    /{l.slug} — {l.name} — {l.landing_templates?.name ?? '—'}
+                  </option>
+                ))}
+              </select>
+              {landingSeleccionada && (
+                // Estado "hay algo sin revisar" = alerta real, no la acción
+                // primaria de la pantalla (esa es "Guardar cambios") — por
+                // eso el tratamiento acá es tinte + borde fucsia con un
+                // punto que pulsa, nunca fondo sólido (ver DESIGN.md → La
+                // Regla de la Rareza Fucsia: un solo sólido por pantalla).
+                <a
+                  href={`/${landingSeleccionada.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setCambiosSinRevisar(false)}
+                  className={
+                    cambiosSinRevisar
+                      ? 'mt-1 flex items-center gap-2 whitespace-nowrap rounded-one-sm border border-one-fucsia/40 bg-one-fucsia/10 px-4 text-sm font-bold text-one-fucsia transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40'
+                      : 'mt-1 flex items-center whitespace-nowrap rounded-one-sm border border-one-oscuro/15 px-4 text-sm font-bold text-one-oscuro transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40'
+                  }
+                >
+                  {cambiosSinRevisar && <span className="size-2 flex-none rounded-full bg-one-fucsia" />}
+                  {cambiosSinRevisar ? 'Ver cambios en vivo ↗' : 'Visualizar landing ↗'}
+                </a>
+              )}
+            </div>
+            {listaLandings.length === 0 && (
+              <p className="mt-1 text-xs text-one-dorado">
+                Todavía no hay ninguna landing creada — usá el botón de arriba para crear la primera.
+              </p>
+            )}
+            {landingSeleccionada && (
+              <p className="mt-1 text-xs text-one-oscuro/40">
+                Abre /{landingSeleccionada.slug} tal cual está en vivo ahora mismo — si esta campaña
+                todavía no está activa, puede mostrar el contenido de otra campaña activa en esa
+                misma landing (o nada, si no hay ninguna).
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+          <h2 className="text-sm font-bold text-one-oscuro">Datos generales</h2>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormInput
+              id="name"
+              name="name"
+              label="Nombre interno"
+              placeholder="Liquidación Agosto 2026"
+              defaultValue={valoresIniciales?.name}
+            />
+            <div>
+              <div className="flex items-center justify-between">
+                <label className={labelClass} htmlFor="category_id">
+                  Categoría
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setModalCategoriaAbierto(true)}
+                  className="rounded-one-sm text-xs font-semibold text-one-fucsia transition-colors duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+                >
+                  ¿No está la que buscás? Crear categoría nueva
+                </button>
+              </div>
+              <select
+                id="category_id"
+                name="category_id"
+                value={categoriaSeleccionada}
+                onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">— Sin categoría —</option>
+                {listaCategorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className={`mt-6 ${pasoActivo === 2 ? '' : 'hidden'}`}>
+        <div className="rounded-one-lg border border-dashed border-one-fucsia/30 bg-one-fucsia/5 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-one-oscuro">
+            <Sparkles className="size-4 text-one-fucsia" strokeWidth={2} />
+            2. Copiá el prompt, pegalo en tu IA, y pegá acá lo que te devuelva
+          </h2>
+          <p className="mt-1 text-xs text-one-oscuro/40">
+            {landingSeleccionada ? (
+              <>
+                El prompt ya trae las {variablesDeLaPlantilla.length} variable(s) de "
+                {landingSeleccionada.landing_templates?.name ?? 'la plantilla elegida'}"
+              </>
+            ) : (
+              'Elegí una landing en el paso 1 para habilitar el prompt — sin eso no hay forma de saber qué variables pedirle a la IA.'
+            )}{' '}
+            — la IA te va a devolver un JSON con todas esas claves completas. Pegalo abajo y
+            "Completar formulario" enchufa todo de una (opcional, también podés cargar todo a mano).
+            Este cuadro también funciona al revés: siempre muestra lo que ya está cargado en el
+            formulario de más abajo, así nunca se pierde — se actualiza solo apenas tipeás algo ahí.
+          </p>
+          <div className="mt-3 flex items-center justify-between">
+            <label className={labelClass} htmlFor="json_campana">
+              JSON (reflejo en vivo de lo cargado — pegá acá para reemplazarlo)
+            </label>
+            <CopyLandingPromptButton landingId={landingId} variables={variablesDeLaPlantilla} disabled={!landingId} />
+          </div>
+          <textarea
+            id="json_campana"
+            rows={4}
+            value={jsonPegado}
+            onChange={(e) => setJsonPegado(e.target.value)}
+            placeholder={'{\n  "name": "...",\n  "advisor_name": "...",\n  "variables": { "titulo": "..." },\n  "emails": [{ "step": 1, "offset_days": 0, "subject": "...", "content": "..." }]\n}'}
+            className={`${inputClass} font-mono text-xs`}
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={aplicarJson}
+              className="rounded-full border border-one-fucsia/40 bg-one-blanco px-4 py-1.5 text-xs font-bold text-one-fucsia transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+            >
+              Completar formulario
+            </button>
+            {mensajeJson && (
+              <span className={`text-xs ${mensajeJson.tipo === 'ok' ? 'text-emerald-600' : 'text-one-rojo'}`}>
+                {mensajeJson.texto}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
-        <h2 className="text-sm font-bold text-one-oscuro">3. Revisá y ajustá</h2>
+      <div className={`mt-6 ${pasoActivo === 3 ? '' : 'hidden'}`}>
+        <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-one-oscuro">
+            <FileText className="size-4 text-one-oscuro/40" strokeWidth={2} />
+            3. Revisá y ajustá el contenido
+          </h2>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormInput
-            id="name"
-            name="name"
-            label="Nombre interno"
-            placeholder="Liquidación Agosto 2026"
-            required
-            defaultValue={valoresIniciales?.name}
-          />
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {variablesDeLaPlantilla.length === 0 && (
-            <p className="text-xs text-one-oscuro/40 sm:col-span-2">
-              {landingId
-                ? 'La plantilla de esta landing no tiene ningún {{clave}} en su HTML — no hay texto editable por campaña.'
-                : 'Elegí una landing arriba para ver qué campos de texto tiene su plantilla.'}
+          {esEnvioPersonalizado && (
+            <p className="mt-1 text-xs text-one-oscuro/40">
+              El texto que ve el lead para cada opción (y la pregunta del selector) se cargan en el
+              paso 4, junto al email que le corresponde a cada una — no acá.
             </p>
           )}
-          {variablesDeLaPlantilla.map((v) =>
-            v.type === 'textarea' ? (
-              <div key={v.key} className="sm:col-span-2">
-                <label className={labelClass} htmlFor={`var_${v.key}`}>
-                  {v.label}
-                </label>
-                <textarea
+
+          {/* key={landingId}: fuerza el remount de todo el bloque al
+              cambiar de landing en el paso 1. Sin esto, dos plantillas
+              distintas que declaran una variable con el mismo key (ej.
+              "titulo"/"subtitulo"/"boton_texto" por convención del
+              seed real) comparten el mismo nodo DOM no controlado
+              (defaultValue) y React lo reutiliza en vez de remontarlo
+              — el contenido tipeado para la landing anterior queda
+              pisando en silencio el campo de la landing nueva. */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" key={landingId}>
+            {variablesPaso3.length === 0 && (
+              <p className="text-xs text-one-oscuro/40 sm:col-span-2">
+                {landingId
+                  ? 'La plantilla de esta landing no tiene ningún {{clave}} en su HTML — no hay texto editable por campaña.'
+                  : 'Elegí una landing en el paso 1 para ver qué campos de texto tiene su plantilla.'}
+              </p>
+            )}
+            {variablesPaso3.map((v) =>
+              v.type === 'textarea' ? (
+                <div key={v.key} className="sm:col-span-2">
+                  <label className={labelClass} htmlFor={`var_${v.key}`}>
+                    {v.label}
+                  </label>
+                  <textarea
+                    id={`var_${v.key}`}
+                    name={`var_${v.key}`}
+                    rows={3}
+                    defaultValue={valoresIniciales?.variables[v.key]}
+                    className={inputClass}
+                  />
+                </div>
+              ) : (
+                <FormInput
+                  key={v.key}
                   id={`var_${v.key}`}
                   name={`var_${v.key}`}
-                  rows={3}
+                  label={v.label}
                   defaultValue={valoresIniciales?.variables[v.key]}
-                  className={inputClass}
                 />
-              </div>
-            ) : (
-              <FormInput
-                key={v.key}
-                id={`var_${v.key}`}
-                name={`var_${v.key}`}
-                label={v.label}
-                defaultValue={valoresIniciales?.variables[v.key]}
-              />
-            )
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-one-lg bg-one-oscuro/5 p-5">
-        <h2 className="text-sm font-bold text-one-oscuro">Asesora y WhatsApp</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormInput
-            id="advisor_name"
-            name="advisor_name"
-            label="Nombre de la asesora"
-            defaultValue={valoresIniciales?.advisor_name ?? undefined}
-          />
-          <FormInput
-            id="whatsapp_number"
-            name="whatsapp_number"
-            label="WhatsApp (sin +, ej. 5493815551234)"
-            defaultValue={valoresIniciales?.whatsapp_number ?? undefined}
-          />
-          <div className="sm:col-span-2">
-            <FormInput
-              id="whatsapp_message"
-              name="whatsapp_message"
-              label="Mensaje prellenado (lo escribe el LEAD, no el sistema)"
-              placeholder="Hola, quiero más info sobre la campaña"
-              defaultValue={valoresIniciales?.whatsapp_message ?? undefined}
-            />
+              )
+            )}
           </div>
+        </section>
+      </div>
+
+      <div className={`mt-6 space-y-6 ${pasoActivo === 4 ? '' : 'hidden'}`}>
+        <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-one-oscuro">
+            <UserRound className="size-4 text-one-oscuro/40" strokeWidth={2} />
+            Asesora y WhatsApp
+          </h2>
+          {esEnvioPersonalizado && (
+            <p className="mt-1 text-xs text-one-oscuro/40">
+              Esta landing es de envío personalizado: el lead elige una de las opciones de abajo al
+              registrarse y recibe solo ese email, al instante — no hay goteo por días.
+            </p>
+          )}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormInput
+              id="advisor_name"
+              name="advisor_name"
+              label="Nombre de la asesora"
+              defaultValue={valoresIniciales?.advisor_name ?? undefined}
+            />
+            <FormInput
+              id="whatsapp_number"
+              name="whatsapp_number"
+              label="WhatsApp (sin +, ej. 5493815551234)"
+              defaultValue={valoresIniciales?.whatsapp_number ?? undefined}
+            />
+            <div className="sm:col-span-2">
+              <FormInput
+                id="whatsapp_message"
+                name="whatsapp_message"
+                label="Mensaje prellenado (lo escribe el LEAD, no el sistema)"
+                placeholder="Hola, quiero más info sobre la campaña"
+                defaultValue={valoresIniciales?.whatsapp_message ?? undefined}
+              />
+            </div>
+          </div>
+        </section>
+
+        {variableOpcionPregunta && (
+          // key={landingId}: mismo caso que el campoOpcion de
+          // BloqueEmail — "opcion_pregunta" es un key literalmente
+          // idéntico en cualquier par de plantillas de envío
+          // personalizado, así que sin la key acá React reutiliza este
+          // mismo input al cambiar de landing y arrastra el valor
+          // tipeado para la landing anterior.
+          <section className="rounded-one-lg bg-one-oscuro/5 p-5" key={landingId}>
+            <FormInput
+              id={`var_${variableOpcionPregunta.key}`}
+              name={`var_${variableOpcionPregunta.key}`}
+              label={`${variableOpcionPregunta.label} — el título del selector de opciones que ve el lead`}
+              defaultValue={valoresIniciales?.variables[variableOpcionPregunta.key]}
+            />
+          </section>
+        )}
+
+        <BloqueEmail
+          numero={1}
+          obligatorio
+          emailTemplates={listaEmailTemplates}
+          valores={pasoPorNumero(1)}
+          onCrearDiseno={setPasoModalDiseno}
+          envioPersonalizado={esEnvioPersonalizado}
+          landingId={landingId}
+          campoOpcion={
+            variableOpcionTexto(1) && {
+              ...variableOpcionTexto(1)!,
+              defaultValue: valoresIniciales?.variables[variableOpcionTexto(1)!.key],
+            }
+          }
+        />
+        <BloqueEmail
+          numero={2}
+          obligatorio={false}
+          emailTemplates={listaEmailTemplates}
+          valores={pasoPorNumero(2)}
+          onCrearDiseno={setPasoModalDiseno}
+          envioPersonalizado={esEnvioPersonalizado}
+          landingId={landingId}
+          campoOpcion={
+            variableOpcionTexto(2) && {
+              ...variableOpcionTexto(2)!,
+              defaultValue: valoresIniciales?.variables[variableOpcionTexto(2)!.key],
+            }
+          }
+        />
+        <BloqueEmail
+          numero={3}
+          obligatorio={false}
+          emailTemplates={listaEmailTemplates}
+          valores={pasoPorNumero(3)}
+          onCrearDiseno={setPasoModalDiseno}
+          envioPersonalizado={esEnvioPersonalizado}
+          landingId={landingId}
+          campoOpcion={
+            variableOpcionTexto(3) && {
+              ...variableOpcionTexto(3)!,
+              defaultValue: valoresIniciales?.variables[variableOpcionTexto(3)!.key],
+            }
+          }
+        />
+        <BloqueEmail
+          numero={4}
+          obligatorio={false}
+          emailTemplates={listaEmailTemplates}
+          valores={pasoPorNumero(4)}
+          onCrearDiseno={setPasoModalDiseno}
+          envioPersonalizado={esEnvioPersonalizado}
+          landingId={landingId}
+          campoOpcion={
+            variableOpcionTexto(4) && {
+              ...variableOpcionTexto(4)!,
+              defaultValue: valoresIniciales?.variables[variableOpcionTexto(4)!.key],
+            }
+          }
+        />
+      </div>
+
+      {state?.error && <p className="mt-6 text-sm text-one-rojo">{state.error}</p>}
+
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setPasoActivo((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3) : p))}
+          className={`rounded-full px-5 py-2.5 text-sm font-bold text-one-oscuro/70 transition-colors duration-200 ease-out hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 ${
+            pasoActivo === 1 ? 'invisible' : ''
+          }`}
+        >
+          ← Anterior
+        </button>
+        <div className="flex items-center gap-3">
+          {pasoActivo < 4 && (
+            <button
+              type="button"
+              onClick={() => setPasoActivo((p) => (p < 4 ? ((p + 1) as 2 | 3 | 4) : p))}
+              className="rounded-full border border-one-oscuro/15 px-5 py-2.5 text-sm font-bold text-one-oscuro transition-colors duration-200 ease-out hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
+            >
+              Siguiente →
+            </button>
+          )}
+          <BotonGuardar texto={botonTexto} textoPendiente={botonTextoPendiente} />
         </div>
-      </section>
-
-      <BloqueEmail
-        numero={1}
-        obligatorio
-        emailTemplates={listaEmailTemplates}
-        valores={pasoPorNumero(1)}
-        onCrearDiseno={setPasoModalDiseno}
-      />
-      <BloqueEmail
-        numero={2}
-        obligatorio={false}
-        emailTemplates={listaEmailTemplates}
-        valores={pasoPorNumero(2)}
-        onCrearDiseno={setPasoModalDiseno}
-      />
-      <BloqueEmail
-        numero={3}
-        obligatorio={false}
-        emailTemplates={listaEmailTemplates}
-        valores={pasoPorNumero(3)}
-        onCrearDiseno={setPasoModalDiseno}
-      />
-      <BloqueEmail
-        numero={4}
-        obligatorio={false}
-        emailTemplates={listaEmailTemplates}
-        valores={pasoPorNumero(4)}
-        onCrearDiseno={setPasoModalDiseno}
-      />
-
-      {state?.error && <p className="text-sm text-one-rojo">{state.error}</p>}
-
-      <BotonGuardar texto={botonTexto} textoPendiente={botonTextoPendiente} />
+      </div>
     </form>
 
     {/* Ambos modales quedan fuera del <form> de campaña a propósito:
@@ -608,11 +956,20 @@ export function CampaignForm({
       <NewLandingModal
         onClose={() => setModalLandingAbierto(false)}
         templates={templatesParaNuevaLanding}
-        categorias={categorias}
         onCreated={(landing) => {
           setListaLandings((prev) => [...prev, landing]);
           setLandingId(landing.id);
           setModalLandingAbierto(false);
+        }}
+      />
+    )}
+    {modalCategoriaAbierto && (
+      <NewCategoryModal
+        onClose={() => setModalCategoriaAbierto(false)}
+        onCreated={(categoria) => {
+          setListaCategorias((prev) => [...prev, categoria]);
+          setCategoriaSeleccionada(categoria.id);
+          setModalCategoriaAbierto(false);
         }}
       />
     )}

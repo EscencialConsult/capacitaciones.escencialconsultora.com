@@ -38,6 +38,28 @@ export function createSupabaseServerClient() {
 }
 
 /**
+ * Chequeo de sesión propio para Server Actions mutantes (2026-08-24,
+ * bug real confirmado) — hasta ahora la ÚNICA protección de esas
+ * funciones era que middleware.ts hubiera interceptado la URL exacta
+ * desde la que se invocan. Las tablas tienen RLS activado pero CERO
+ * policies (ver supabase/migrations/0001_init.sql), así que sin sesión
+ * y sin este chequeo, cualquier código que termine llamando a una
+ * Server Action fuera del árbol /admin/(dashboard) —por un cambio
+ * futuro en el matcher del middleware, por ejemplo— quedaría con
+ * lectura/escritura total vía service role. Se llama como primera
+ * línea de cada Server Action que inserta/actualiza/borra algo; devuelve
+ * el user si hay sesión válida, o null si no.
+ */
+export async function requireAdmin() {
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user;
+}
+
+/**
  * Cliente con la SERVICE ROLE KEY — bypassea RLS por completo. Úsalo
  * SOLO en Route Handlers/Server Actions que ya validaron lo que hace
  * falta a mano (ej. el endpoint público de captura de leads, que no

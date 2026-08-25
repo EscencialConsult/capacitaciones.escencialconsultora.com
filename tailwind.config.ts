@@ -34,6 +34,37 @@ const config: Config = {
         'one-md': '16px',
         'one-lg': '24px',
       },
+      boxShadow: {
+        // Sistema de elevación del panel admin (2026-08-24, rediseño) —
+        // sombras teñidas de one-oscuro (no gris/negro puro) para que se
+        // sientan parte de la marca, no un shadow por default de librería.
+        // Tres escalones nada más: reposo casi imperceptible, hover con
+        // intención, modal/popover que necesita separarse del fondo de
+        // verdad. Nunca una sombra grande en estado idle (ver skill
+        // anti-ia) — el salto de "sm" a "md" es lo que comunica interacción.
+        'one-sm': '0 1px 2px rgba(26,24,29,0.04), 0 1px 1px rgba(26,24,29,0.03)',
+        'one-md': '0 12px 24px -8px rgba(26,24,29,0.16), 0 4px 8px -4px rgba(26,24,29,0.08)',
+        'one-lg': '0 24px 48px -12px rgba(26,24,29,0.28), 0 8px 16px -4px rgba(26,24,29,0.12)',
+        // Único uso de sombra con color de marca (no neutra) — reservado
+        // para el elemento más importante de una pantalla (CTA principal
+        // en foco, tarjeta seleccionada), nunca en un grid completo.
+        'one-fucsia': '0 12px 28px -8px rgba(225,123,215,0.35)',
+      },
+      backgroundImage: {
+        // Textura de fondo sutil para el shell del panel (ver layout.tsx)
+        // — mismo criterio que SISTEMA_DISENO_LANDING usa para las
+        // landings públicas (lib/landing-template-defaults.ts): puntos
+        // finos a opacidad casi nula, para que el fondo blanco plano no
+        // se sienta genérico, sin competir nunca con el contenido real.
+        'one-dots': 'radial-gradient(circle, rgba(26,24,29,0.08) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        // Nombre distinto de backgroundImage.one-dots a propósito — Tailwind
+        // genera la clase de tamaño como bg-<key> igual que la de imagen, así
+        // que compartir el mismo nombre las hacía colisionar (ambas
+        // "bg-one-dots", el linter las marcaba como conflicto real).
+        'one-dots-size': '22px 22px',
+      },
     },
   },
   plugins: [],

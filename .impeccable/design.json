@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-25T00:00:00.000Z",
+  "title": "Design System: Escencial — Panel de Administración",
+  "extensions": {
+    "colorMeta": {
+      "negro": { "role": "neutral", "displayName": "Negro Absoluto", "canonical": "#000000", "tonalRamp": ["#262626", "#404040", "#595959", "#737373", "#999999", "#b8b8b8", "#d6d6d6", "#f2f2f2"] },
+      "oscuro": { "role": "neutral", "displayName": "Oscuro Escencial", "canonical": "#1a181d", "tonalRamp": ["#26232a", "#3f3a46", "#585162", "#71687e", "#978fa3", "#b6b1be", "#d5d2da", "#f2f1f3"] },
+      "blanco": { "role": "neutral", "displayName": "Blanco Puro", "canonical": "#fefeff", "tonalRamp": ["#262626", "#404040", "#595959", "#737373", "#999999", "#b8b8b8", "#d6d6d6", "#f2f2f2"] },
+      "fucsia": { "role": "primary", "displayName": "Fucsia Escencial", "canonical": "#e17bd7", "tonalRamp": ["#3e0e3a", "#681860", "#912186", "#bb2aad", "#d959cd", "#e58bdc", "#f0bdeb", "#faeaf9"] },
+      "cian": { "role": "secondary", "displayName": "Cian Estudio", "canonical": "#6be1e3", "tonalRamp": ["#0c3f40", "#146a6b", "#1c9496", "#25bec1", "#53dcdf", "#87e7e8", "#baf1f2", "#eafbfb"] },
+      "dorado": { "role": "tertiary", "displayName": "Dorado Instrumento", "canonical": "#e4c76a", "tonalRamp": ["#41340c", "#6c5714", "#977a1b", "#c29c23", "#e0be52", "#e9d286", "#f2e5ba", "#fbf7e9"] },
+      "lavanda": { "role": "neutral", "displayName": "Lavanda", "canonical": "#a4a8c0", "tonalRamp": ["#1f212d", "#34374b", "#494e69", "#5e6488", "#868cac", "#abaec5", "#cfd1de", "#f0f1f5"] },
+      "gris-claro": { "role": "neutral", "displayName": "Gris Claro", "canonical": "#c6c9d7", "tonalRamp": ["#20222d", "#35394b", "#4a4f69", "#5f6687", "#878dab", "#abb0c4", "#cfd2dd", "#f0f1f4"] },
+      "rojo": { "role": "error", "displayName": "Rojo Alerta", "canonical": "#e2445c", "tonalRamp": ["#420a13", "#6e111f", "#9b182c", "#c71f38", "#e44e65", "#ec8393", "#f4b8c1", "#fce9ec"] },
+      "exito": { "role": "success", "displayName": "Verde Éxito", "canonical": "#059669", "tonalRamp": ["#024a34", "#047b56", "#06ad79", "#07de9b", "#3af8bd", "#75fad1", "#b0fce5", "#e6fef7"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Título <h1> de cada pantalla del panel." },
+      "headline": { "displayName": "Headline", "purpose": "Título de sección/modal dentro de una pantalla." },
+      "title": { "displayName": "Title", "purpose": "Encabezado de subsección, nombre de tarjeta de stat." },
+      "body": { "displayName": "Body", "purpose": "Texto de tabla, contenido de formulario, copy general." },
+      "label": { "displayName": "Label", "purpose": "Labels de campo, encabezado de columna, metadatos." }
+    },
+    "shadows": [
+      { "name": "one-sm", "value": "0 1px 2px rgba(26,24,29,0.04), 0 1px 1px rgba(26,24,29,0.03)", "purpose": "Estado de reposo de cualquier tarjeta — casi imperceptible a propósito." },
+      { "name": "one-md", "value": "0 12px 24px -8px rgba(26,24,29,0.16), 0 4px 8px -4px rgba(26,24,29,0.08)", "purpose": "Hover de tarjeta interactiva, elemento con foco real." },
+      { "name": "one-lg", "value": "0 24px 48px -12px rgba(26,24,29,0.28), 0 8px 16px -4px rgba(26,24,29,0.12)", "purpose": "Modal/popover — necesita separarse de verdad del fondo." },
+      { "name": "one-fucsia", "value": "0 12px 28px -8px rgba(225,123,215,0.35)", "purpose": "Sombra de marca, reservada para el elemento más importante de una pantalla puntual." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Easing por default para transiciones de estado (ya usado en sidebar/header/rise-in)." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Hover de fila de tabla, cambios de color puntuales." },
+      { "name": "duration-standard", "value": "200-300ms", "purpose": "Hover de botón/tarjeta, colapso de sidebar." },
+      { "name": "stagger-step", "value": "40ms", "purpose": "Delay incremental entre ítems de una lista/grid (.stagger-in)." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción primaria de una pantalla — como mucho uno por vista.",
+      "html": "<button class=\"ds-btn-primary\">+ Nueva campaña</button>",
+      "css": ".ds-btn-primary { background: #e17bd7; color: #000000; border-radius: 9999px; padding: 10px 24px; font-size: 14px; font-weight: 700; font-family: 'Exo 2', system-ui, sans-serif; border: none; cursor: pointer; transition: transform 250ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { transform: translateY(-2px); } .ds-btn-primary:focus-visible { outline: 2px solid #e17bd7; outline-offset: 2px; }"
+    },
+    {
+      "name": "Botón secundario (ghost)",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Cualquier acción que no sea la primaria de la pantalla.",
+      "html": "<button class=\"ds-btn-secondary\">+ Nueva plantilla</button>",
+      "css": ".ds-btn-secondary { background: transparent; color: #1a181d; border: 1px solid rgba(26,24,29,0.15); border-radius: 9999px; padding: 10px 24px; font-size: 14px; font-weight: 700; font-family: 'Exo 2', system-ui, sans-serif; cursor: pointer; transition: background-color 200ms ease-out, transform 250ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-secondary:hover { background: rgba(26,24,29,0.05); transform: translateY(-2px); }"
+    },
+    {
+      "name": "Tarjeta de stat",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Tarjeta de resumen en el home del panel — número grande + label.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">Campañas activas</p><p class=\"ds-card-value\">12</p></div>",
+      "css": ".ds-card { background: #fefeff; border: 1px solid rgba(26,24,29,0.08); border-radius: 24px; padding: 20px; box-shadow: 0 1px 2px rgba(26,24,29,0.04), 0 1px 1px rgba(26,24,29,0.03); transition: box-shadow 250ms cubic-bezier(0.16,1,0.3,1); } .ds-card:hover { box-shadow: 0 12px 24px -8px rgba(26,24,29,0.16), 0 4px 8px -4px rgba(26,24,29,0.08); } .ds-card-label { font-size: 14px; color: rgba(26,24,29,0.6); font-family: 'Exo 2', system-ui, sans-serif; margin: 0; } .ds-card-value { font-size: 24px; font-weight: 800; color: #1a181d; font-family: 'Exo 2', system-ui, sans-serif; margin: 4px 0 0; }"
+    },
+    {
+      "name": "Input de formulario",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo de texto estándar de cualquier formulario del panel.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Nombre\">",
+      "css": ".ds-input { background: #fefeff; color: #1a181d; border: 1px solid rgba(26,24,29,0.15); border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: 'Exo 2', system-ui, sans-serif; width: 100%; box-sizing: border-box; transition: border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-input:focus-visible { outline: none; border-color: #e17bd7; box-shadow: 0 0 0 2px rgba(225,123,215,0.2); }"
+    },
+    {
+      "name": "Badge de estado",
+      "kind": "chip",
+      "description": "Un solo color con significado real por fila — activo/éxito, error, o neutro.",
+      "html": "<span class=\"ds-badge ds-badge-exito\">activo</span>",
+      "css": ".ds-badge { display: inline-block; border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; font-family: 'Exo 2', system-ui, sans-serif; } .ds-badge-exito { background: rgba(5,150,105,0.1); color: #059669; } .ds-badge-error { background: rgba(226,68,92,0.1); color: #e2445c; } .ds-badge-neutro { background: rgba(26,24,29,0.05); color: rgba(26,24,29,0.6); }"
+    },
+    {
+      "name": "Ítem de navegación (sidebar)",
+      "kind": "nav",
+      "description": "Ítem del sidebar — estado activo es el único lugar del nav con color de marca.",
+      "html": "<a class=\"ds-navitem ds-navitem-active\" href=\"#\">Campañas</a>",
+      "css": ".ds-navitem { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 500; font-family: 'Exo 2', system-ui, sans-serif; color: #a4a8c0; text-decoration: none; transition: background-color 200ms ease-out, color 200ms ease-out; } .ds-navitem:hover { background: rgba(254,254,255,0.05); color: #fefeff; } .ds-navitem-active { background: rgba(225,123,215,0.15); color: #e17bd7; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Panel de Control de Precisión",
+    "overview": "Como la cabina de un instrumento de precisión: cada dato en su lugar exacto, cero ruido visual entre el admin y la tarea que vino a resolver, pero con un acento de color vivo que le da calidez a lo técnico — nunca una herramienta fría de SaaS genérico. La superficie es clara y casi plana en reposo (fondo one-blanco, tarjetas one-oscuro/5); la profundidad aparece solo cuando algo responde a una acción del usuario, nunca como decoración estática. El acento one-fucsia es el único color que grita — todo lo demás (one-cian, one-dorado) susurra en su rol secundario. Este sistema rechaza explícitamente lo genérico-IA: gradientes aplicados por todos lados en vez de solo donde suman, glow ambient dentro de cada tarjeta de una lista, badges de 3+ colores distintos en una misma fila, cards idénticas en grilla sin ninguna jerarquía real entre ellas, sombras fuertes en estado de reposo, opacidades sueltas sin sistema.",
+    "keyCharacteristics": [
+      "Superficie clara y casi plana en reposo; la sombra aparece como respuesta, no como default.",
+      "Un único acento saturado (one-fucsia) para la acción primaria de cada pantalla — el resto, outline o neutro.",
+      "one-cian y one-dorado como voces secundarias reales, no decorativas — hoy infrautilizados fuera del login.",
+      "Tipografía Exo 2 en toda la interfaz, jerarquía por peso y tamaño, nunca por color.",
+      "Radios generosos (8/16/24px) y botones tipo píldora, nunca esquinas duras."
+    ],
+    "rules": [
+      { "name": "La Regla de la Rareza Fucsia", "body": "El acento primario ocupa como mucho UN elemento por pantalla con intención real de destacar. Si dos elementos compiten por fucsia en la misma vista, uno de los dos está mal — bajarlo a outline/neutro.", "section": "colors" },
+      { "name": "La Regla de los Badges Neutros", "body": "Una fila de tabla o tarjeta tiene como mucho UN badge de color; cualquier badge adicional va neutro (bg-one-oscuro/5, text-one-oscuro/60).", "section": "colors" },
+      { "name": "La Regla del Peso, No el Color", "body": "La jerarquía tipográfica se comunica con peso y tamaño, nunca coloreando texto para que resalte — el color se reserva para estado.", "section": "typography" },
+      { "name": "La Regla del Reposo Plano", "body": "Ninguna superficie lleva sombra visible en estado idle salvo un modal/popover. Si una tarjeta necesita sombra para verse bien en reposo, el problema es de contraste de fondo, no de falta de sombra.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do usar one-fucsia sólido para UN SOLO botón por pantalla — el resto, outline/ghost.",
+      "Do dejar las tarjetas casi planas en reposo (shadow-one-sm) y subir la sombra recién en hover (shadow-one-md).",
+      "Do usar one-cian y one-dorado como acentos secundarios reales en más pantallas.",
+      "Do animar transform/opacity/colors explícitos, nunca transition-all.",
+      "Do respetar prefers-reduced-motion en toda animación nueva."
+    ],
+    "donts": [
+      "Don't usar gradiente de fondo en una sección completa — reservado para texto de título puntual o un acento de 2-3px.",
+      "Don't poner glow/ambient light dentro de cada tarjeta de un listado.",
+      "Don't usar 3 o más badges de color distinto en la misma fila/tarjeta.",
+      "Don't aplicar sombra fuerte a una tarjeta en estado de reposo.",
+      "Don't usar border-left/border-right de más de 1px como acento de color fijo en tarjetas o filas.",
+      "Don't tocar lógica de negocio, Server Actions ni validaciones al aplicar este sistema."
+    ]
+  }
+}
