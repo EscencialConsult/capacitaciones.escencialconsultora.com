@@ -24,5 +24,8 @@ export async function signIn(_prevState: { error?: string } | undefined, formDat
 export async function signOut() {
   const supabase = createSupabaseServerClient();
   await supabase.auth.signOut();
-  redirect('/admin/login');
+  // /admin/login pisado directo (sin sesión) da 404 desde este momento
+  // (ver middleware.ts) — mandar acá por la puerta secreta es lo único
+  // que evita que cerrar sesión te deje viendo un 404 en la cara.
+  redirect(`/${process.env.ADMIN_SECRET_PATH}/login`);
 }
