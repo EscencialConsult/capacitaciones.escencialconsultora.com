@@ -145,9 +145,27 @@ async function resolverCuentaDeEnvio(
   return null;
 }
 
+/**
+ * Diagnóstico temporal (2026-08-26) — un envío quedaba en 'processing'
+ * indefinidamente (>10 min) sin tirar ninguna excepción ni terminar,
+ * y un catch de nivel superior tampoco vio nada (ver
+ * process-pending-emails-background.ts). Esto deja un rastro paso a
+ * paso en system_alerts (se pisa a sí mismo, mismo source) para ver
+ * en qué línea exacta se queda colgado. Borrar junto con
+ * netlify/functions/diagnostico-background.ts una vez resuelto.
+ */
+async function registrarPaso(supabase: ReturnType<typeof createSupabaseServiceClient>, texto: string) {
+  console.log('processPendingEmails paso:', texto);
+  await supabase.from('system_alerts').upsert(
+    { source: 'diagnostico_process_pending', message: texto, last_seen_at: new Date().toISOString(), resolved_at: null },
+    { onConflict: 'source' }
+  );
+}
+
 export async function processPendingEmails() {
   const supabase = createSupabaseServiceClient();
   const resultado = { procesados: 0, enviados: 0, errores: 0, omitidos: 0 };
+  await registrarPaso(supabase, 'arrancó processPendingEmails');
 
   // Bug real confirmado (2026-08-24, Ronda 3) — recuperación de filas
   // huérfanas: si un proceso anterior murió justo después de reclamar
@@ -169,6 +187,7 @@ export async function processPendingEmails() {
   if (recuperados && recuperados.length > 0) {
     console.warn(`processPendingEmails: se recuperaron ${recuperados.length} fila(s) de email_sends huérfanas en 'processing'.`);
   }
+  await registrarPaso(supabase, `recuperación de huérfanas ok (${recuperados?.length ?? 0})`);
 
   const { data: pendientes, error } = await supabase
     .from('email_sends')
@@ -184,12 +203,14 @@ export async function processPendingEmails() {
     console.error('Error leyendo email_sends pendientes:', error);
     return resultado;
   }
+  await registrarPaso(supabase, `SELECT pendientes ok (${pendientes?.length ?? 0} filas)`);
 
   const webappUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
   const cacheCuentas = new Map<string, CuentaEnvio | null>();
 
   for (const envio of pendientes ?? []) {
     resultado.procesados++;
+    await registrarPaso(supabase, `loop item ${resultado.procesados}/${pendientes?.length ?? 0} (${envio.id}) — arrancó`);
 
     const lead = envio.leads as unknown as {
       email: string;
@@ -230,7 +251,9 @@ export async function processPendingEmails() {
       continue;
     }
 
+    await registrarPaso(supabase, `item ${envio.id} — antes de resolverCuentaDeEnvio (activated_by=${lead.campaigns.activated_by})`);
     const cuenta = await resolverCuentaDeEnvio(supabase, lead.campaigns.activated_by, cacheCuentas);
+    await registrarPaso(supabase, `item ${envio.id} — resolverCuentaDeEnvio devolvió ${cuenta ? cuenta.proveedor : 'null'}`);
 
     if (!cuenta) {
       const mensaje = lead.campaigns.activated_by
@@ -259,6 +282,7 @@ export async function processPendingEmails() {
     if (!claimed || claimed.length === 0) {
       continue;
     }
+    await registrarPaso(supabase, `item ${envio.id} — reclamado, arrancando envío por ${cuenta.proveedor}`);
 
     try {
       const whatsappUrl = `${webappUrl}/api/track?lead_id=${envio.lead_id}&step=${paso.step_number}`;
@@ -295,6 +319,7 @@ export async function processPendingEmails() {
               subject: paso.subject,
               htmlContent: html,
             });
+      await registrarPaso(supabase, `item ${envio.id} — envío por ${cuenta.proveedor} respondió ok, guardando 'sent'`);
 
       await supabase
         .from('email_sends')
@@ -313,10 +338,12 @@ export async function processPendingEmails() {
 
       resultado.enviados++;
     } catch (err) {
+      await registrarPaso(supabase, `item ${envio.id} — cayó en catch: ${err instanceof Error ? err.message : String(err)}`);
       await marcarError(supabase, envio.id, err instanceof Error ? err.message : String(err));
       resultado.errores++;
     }
   }
+  await registrarPaso(supabase, `terminó el loop — ${JSON.stringify(resultado)}`);
 
   return resultado;
 }
