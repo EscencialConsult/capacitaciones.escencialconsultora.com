@@ -22,11 +22,11 @@ function InstruccionesBrevo() {
   return (
     <ol className="list-decimal space-y-2 pl-4">
       <li>
-        <strong>Creá tu cuenta</strong> (si todavía no tenés una para esto) — andá a{' '}
+        <strong>Creá tu cuenta</strong> (si todavía no tenés una para esto, o usá la que ya tengas de Brevo) — andá a{' '}
         <a href="https://brevo.com" target="_blank" rel="noreferrer" className="text-one-fucsia hover:underline">
           brevo.com
         </a>{' '}
-        y registrate gratis. Para esta plataforma se usa la cuenta <code className="rounded-one-sm bg-one-oscuro/10 px-1">areaidautomatizaciones</code>, no una cuenta personal.
+        y registrate gratis. Es TU cuenta, no una compartida — cada admin conecta la suya.
       </li>
       <li>
         <strong>Andá directo a la página de API Keys</strong> —{' '}
@@ -48,6 +48,23 @@ function InstruccionesBrevo() {
         <strong>Copiá el código completo</strong> que te muestra — empieza con <code className="rounded-one-sm bg-one-oscuro/10 px-1">xkeysib-</code> y es largo (~80 caracteres). Brevo lo muestra <strong>una sola vez</strong>, así que copialo ahora.
       </li>
       <li>
+        <div className="rounded-one-sm border border-one-dorado/40 bg-one-dorado/10 p-3">
+          <strong className="text-one-oscuro">Paso obligatorio, fácil de saltear sin darte cuenta</strong> — andá a{' '}
+          <a
+            href="https://app.brevo.com/security/authorised_ips"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-one-fucsia hover:underline"
+          >
+            app.brevo.com/security/authorised_ips
+          </a>{' '}
+          y desactivá el bloqueo de IPs no autorizadas (&quot;Deactivate blocking&quot;). Sin esto, la clave se conecta y se
+          valida perfecto acá arriba — el error recién aparece después, en silencio, cuando la plataforma intenta mandar un
+          email de verdad desde un servidor que Brevo no reconoce. No hay forma de resolver esto desde acá: es una
+          configuración de seguridad de tu cuenta de Brevo, solo se toca desde su panel.
+        </div>
+      </li>
+      <li>
         <strong>Pegalo acá arriba</strong>, en el campo &quot;API Key de Brevo&quot; de este mismo panel, y guardá — nunca lo peques en un chat, un email ni ninguna nota aparte.
       </li>
     </ol>
@@ -62,7 +79,7 @@ function InstruccionesResend() {
         <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-one-fucsia hover:underline">
           resend.com
         </a>{' '}
-        y registrate gratis. Misma cuenta <code className="rounded-one-sm bg-one-oscuro/10 px-1">areaidautomatizaciones</code> que se usa para Brevo, no una personal.
+        y registrate gratis. Es TU cuenta, no una compartida — cada admin conecta la suya.
       </li>
       <li>
         <strong>Verificá tu dominio primero</strong> (obligatorio antes de poder mandar nada) — andá directo a{' '}
