@@ -187,8 +187,8 @@ export default async function IntegrationsPage() {
 
       <p className="mt-6 text-xs text-one-oscuro/40">
         Cuando actives una campaña, sus emails se mandan por la cuenta que tengas conectada — si tenés las dos,
-        Resend tiene prioridad (no depende de una IP autorizada, a diferencia de Brevo). Sin ninguna cuenta propia
-        conectada, no vas a poder activar ninguna campaña.
+        Brevo tiene prioridad y Resend queda de respaldo. Sin ninguna cuenta propia conectada, no vas a poder
+        activar ninguna campaña.
       </p>
     </div>
   );

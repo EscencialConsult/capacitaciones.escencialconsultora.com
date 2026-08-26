@@ -93,8 +93,36 @@ async function resolverCuentaDeEnvio(
 
   if (cache.has(activatedBy)) return cache.get(activatedBy)!;
 
-  // Resend primero — sin fricción de IP autorizada, a diferencia de
-  // Brevo (pedido explícito de Facundo, 2026-08-26).
+  // Orden Brevo → Resend → (Google, a futuro — mencionado, todavía sin
+  // implementar) — pedido explícito (2026-08-26). Brevo primero porque
+  // ya es el remitente establecido (mejor reputación de entrega hoy);
+  // Resend queda de respaldo si Brevo no está conectada para este
+  // usuario. Ojo: Brevo sigue exigiendo que su restricción de "IPs
+  // autorizadas" esté desactivada en app.brevo.com/security/authorised_ips
+  // — eso es un candado de la cuenta de Brevo en sí, ninguna clave por
+  // válida que sea lo puede saltear desde acá.
+  const { data: brevo } = await supabase
+    .from('brevo_accounts')
+    .select('id, api_key_encrypted, env_var_name, sender_email, sender_name')
+    .eq('user_id', activatedBy)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (brevo) {
+    const apiKey = await resolverApiKeyBrevo(brevo);
+    if (apiKey) {
+      const cuenta: CuentaEnvio = {
+        proveedor: 'brevo',
+        apiKey,
+        senderEmail: brevo.sender_email,
+        senderName: brevo.sender_name,
+        cuentaId: brevo.id,
+      };
+      cache.set(activatedBy, cuenta);
+      return cuenta;
+    }
+  }
+
   const { data: resend } = await supabase
     .from('resend_accounts')
     .select('id, api_key_encrypted, sender_email, sender_name')
@@ -119,27 +147,11 @@ async function resolverCuentaDeEnvio(
     }
   }
 
-  const { data: brevo } = await supabase
-    .from('brevo_accounts')
-    .select('id, api_key_encrypted, env_var_name, sender_email, sender_name')
-    .eq('user_id', activatedBy)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (brevo) {
-    const apiKey = await resolverApiKeyBrevo(brevo);
-    if (apiKey) {
-      const cuenta: CuentaEnvio = {
-        proveedor: 'brevo',
-        apiKey,
-        senderEmail: brevo.sender_email,
-        senderName: brevo.sender_name,
-        cuentaId: brevo.id,
-      };
-      cache.set(activatedBy, cuenta);
-      return cuenta;
-    }
-  }
+  // TODO (futuro, solo mencionado por ahora — 2026-08-26): Google como
+  // tercer proveedor de respaldo. Cuando se implemente, va acá abajo,
+  // después de Resend — mismo patrón: tabla propia (google_accounts?),
+  // su propia FK en email_sends (ver resend_account_id, migración
+  // 0022, mismo criterio), resuelto por usuario igual que los otros dos.
 
   cache.set(activatedBy, null);
   return null;
