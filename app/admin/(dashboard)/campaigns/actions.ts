@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
+import { processPendingEmails } from '@/lib/email/process-pending';
 
 const campaignSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre interno.'),
@@ -613,4 +614,42 @@ export async function deleteCampaign(campaignId: string) {
   }
 
   revalidatePath('/admin/campaigns');
+}
+
+/**
+ * Reintentar un envío puntual que quedó en 'error' (2026-08-26, pedido
+ * explícito desde la pantalla de leads) — lo vuelve a 'pending' (limpia
+ * error_message y claimed_at) y corre processPendingEmails() al toque,
+ * en vez de solo dejarlo agendado para la próxima pasada del cron
+ * (hasta 1 hora de espera, sin necesidad). Reutiliza toda la lógica de
+ * envío real (elegir cuenta según el dueño de la campaña, reintentos
+ * con backoff) — no hay un camino de envío aparte para esto.
+ *
+ * El `.eq('status', 'error')` en el UPDATE es a propósito: si por lo
+ * que sea esta fila ya no está en 'error' (otra pestaña la reintentó
+ * primero, o el cron la tomó justo ahora), este UPDATE no afecta nada
+ * y processPendingEmails() de abajo simplemente no encuentra nada
+ * nuevo que hacer con ella — no hay forma de mandarla dos veces por
+ * un click duplicado.
+ */
+export async function reintentarEnvio(emailSendId: string) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('email_sends')
+    .update({ status: 'pending', error_message: null, claimed_at: null })
+    .eq('id', emailSendId)
+    .eq('status', 'error');
+
+  if (error) {
+    console.error('Error reintentando envío:', error);
+    return { error: 'No se pudo reintentar. Probá de nuevo.' };
+  }
+
+  const resultado = await processPendingEmails();
+  revalidatePath('/admin/campaigns/[id]/leads', 'page');
+  return resultado;
 }

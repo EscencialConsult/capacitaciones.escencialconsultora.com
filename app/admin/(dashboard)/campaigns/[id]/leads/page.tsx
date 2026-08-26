@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Check, Clock, X, Minus } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
+import { RetryEnvioButton } from './RetryEnvioButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,7 @@ const etiquetaEtapa: Record<string, string> = {
   no_aplica: 'no aplica',
 };
 
-type EmailSend = { status: string; scheduled_for: string; landing_email_step_id: string };
+type EmailSend = { id: string; status: string; scheduled_for: string; landing_email_step_id: string; error_message: string | null };
 
 // Leads viven acá (por campaña), no en Landings — una landing es solo
 // el link, la campaña es la que capturó los leads. Ver
@@ -64,7 +65,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
     supabase
       .from('leads')
       .select(
-        'id, first_name, last_name, email, phone, selected_option, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(status, scheduled_for, landing_email_step_id)'
+        'id, first_name, last_name, email, phone, selected_option, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(id, status, scheduled_for, landing_email_step_id, error_message)'
       )
       .eq('campaign_id', params.id)
       .order('created_at', { ascending: false }),
@@ -161,7 +162,13 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
               // faltar en silencio de la fila.
               const etapas = pasosConfigurados.map((paso) => {
                 const envio = sends.find((s) => s.landing_email_step_id === paso.id);
-                return { numero: paso.step_number, estado: envio?.status ?? 'no_aplica', fecha: envio?.scheduled_for };
+                return {
+                  numero: paso.step_number,
+                  estado: envio?.status ?? 'no_aplica',
+                  fecha: envio?.scheduled_for,
+                  envioId: envio?.id,
+                  errorMessage: envio?.error_message,
+                };
               });
               return (
                 <tr
@@ -213,15 +220,17 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                       {etapas.map((e) => {
                         const Icono = iconoEtapa[e.estado] ?? Minus;
                         return (
-                          <span
-                            key={e.numero}
-                            title={`Etapa ${e.numero}: ${etiquetaEtapa[e.estado] ?? e.estado}${
-                              e.fecha ? ' — ' + new Date(e.fecha).toLocaleString('es-AR') : ''
-                            }`}
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${estiloEtapa[e.estado] ?? ''}`}
-                          >
-                            {e.numero}
-                            <Icono className="size-3" strokeWidth={3} />
+                          <span key={e.numero} className="inline-flex items-center gap-1">
+                            <span
+                              title={`Etapa ${e.numero}: ${etiquetaEtapa[e.estado] ?? e.estado}${
+                                e.fecha ? ' — ' + new Date(e.fecha).toLocaleString('es-AR') : ''
+                              }${e.errorMessage ? ' — ' + e.errorMessage : ''}`}
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${estiloEtapa[e.estado] ?? ''}`}
+                            >
+                              {e.numero}
+                              <Icono className="size-3" strokeWidth={3} />
+                            </span>
+                            {e.estado === 'error' && e.envioId && <RetryEnvioButton envioId={e.envioId} />}
                           </span>
                         );
                       })}
