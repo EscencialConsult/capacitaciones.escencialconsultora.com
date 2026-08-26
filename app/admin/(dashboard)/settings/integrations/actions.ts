@@ -19,21 +19,23 @@ type Resultado = { error?: string; ok?: true };
  * "REGLA ANTI-INVENCIÓN" que ya usa el resto del sistema para no
  * guardar datos sin confirmar, aplicado acá a credenciales en vez de
  * contenido de campaña.
+ *
+ * Por persona (2026-08-26, pedido explícito) — antes esto era una sola
+ * fila global por proveedor, compartida por todo el panel. Ahora cada
+ * cuenta de Brevo/Resend tiene su propio `user_id`: cada admin conecta
+ * la suya, y el sistema de créditos (ver migración 0019) cobra según
+ * de quién es la cuenta que efectivamente activó cada campaña.
  */
 
 const conectarBrevoSchema = z.object({
   api_key: z.string().trim().min(1, 'Pegá tu API key de Brevo.'),
-  // Solo hacen falta la PRIMERA vez que se conecta Brevo desde el panel
-  // (todavía no existe ninguna fila en brevo_accounts) — si ya hay una
-  // cuenta activa (lo más probable, porque el sistema ya manda emails
-  // hoy vía variable de entorno), estos campos se ignoran: actualizar
-  // solo cambia la clave, nunca el remitente ya configurado.
   sender_email: z.string().trim().email('Email de remitente inválido.').optional().or(z.literal('')),
   sender_name: z.string().trim().optional().default(''),
 });
 
 export async function conectarBrevo(_prevState: Resultado | undefined, formData: FormData): Promise<Resultado> {
-  if (!(await requireAdmin())) return { error: 'No autorizado.' };
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
 
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const parsed = conectarBrevoSchema.safeParse(raw);
@@ -50,15 +52,10 @@ export async function conectarBrevo(_prevState: Resultado | undefined, formData:
 
   const supabase = createSupabaseServiceClient();
 
-  // La cuenta que hoy usa process-pending.ts para mandar emails de
-  // verdad — mismo criterio de selección (activa, mayor prioridad) para
-  // no crear una segunda cuenta "fantasma" que compita con la real.
   const { data: actual } = await supabase
     .from('brevo_accounts')
     .select('id')
-    .eq('is_active', true)
-    .order('priority', { ascending: true })
-    .limit(1)
+    .eq('user_id', admin.id)
     .maybeSingle();
 
   const apiKeyEncriptada = encryptSecret(apiKey);
@@ -75,18 +72,18 @@ export async function conectarBrevo(_prevState: Resultado | undefined, formData:
       return { error: 'La clave es válida pero no se pudo guardar. Probá de nuevo.' };
     }
   } else {
-    // No hay ninguna cuenta de Brevo todavía — esta va a ser la primera,
-    // así que además de la key hace falta saber desde qué dirección se
-    // manda (columna not null, sin default razonable posible).
+    // Primera vez que ESTE admin conecta Brevo — hace falta también el
+    // remitente, columna not null sin default razonable posible.
     if (!parsed.data.sender_email) {
       return {
         error:
-          'Todavía no hay ninguna cuenta de Brevo conectada — además de la clave, completá el email y el nombre de remitente para crear la primera.',
+          'Todavía no conectaste ninguna cuenta de Brevo — además de la clave, completá el email y el nombre de remitente para crear la tuya.',
       };
     }
 
     const { error } = await supabase.from('brevo_accounts').insert({
-      name: 'Brevo (panel de integraciones)',
+      user_id: admin.id,
+      name: `Brevo — ${admin.email}`,
       sender_email: parsed.data.sender_email,
       sender_name: parsed.data.sender_name || parsed.data.sender_email,
       api_key_encrypted: apiKeyEncriptada,
@@ -107,16 +104,15 @@ export async function conectarBrevo(_prevState: Resultado | undefined, formData:
 }
 
 export async function desconectarBrevo(): Promise<Resultado> {
-  if (!(await requireAdmin())) return { error: 'No autorizado.' };
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
 
   const supabase = createSupabaseServiceClient();
 
   const { data: actual } = await supabase
     .from('brevo_accounts')
-    .select('id, env_var_name')
-    .eq('is_active', true)
-    .order('priority', { ascending: true })
-    .limit(1)
+    .select('id')
+    .eq('user_id', admin.id)
     .maybeSingle();
 
   if (!actual) return { ok: true };
@@ -142,10 +138,13 @@ export async function desconectarBrevo(): Promise<Resultado> {
 
 const conectarResendSchema = z.object({
   api_key: z.string().trim().min(1, 'Pegá tu API key de Resend.'),
+  sender_email: z.string().trim().email('Email de remitente inválido.').optional().or(z.literal('')),
+  sender_name: z.string().trim().optional().default(''),
 });
 
 export async function conectarResend(_prevState: Resultado | undefined, formData: FormData): Promise<Resultado> {
-  if (!(await requireAdmin())) return { error: 'No autorizado.' };
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
 
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const parsed = conectarResendSchema.safeParse(raw);
@@ -162,26 +161,50 @@ export async function conectarResend(_prevState: Resultado | undefined, formData
 
   const supabase = createSupabaseServiceClient();
 
-  // Singleton en los hechos (el panel muestra una sola tarjeta de
-  // Resend) — si ya había una fila, se reemplaza; si no, se crea.
-  const { data: actual } = await supabase.from('resend_accounts').select('id').limit(1).maybeSingle();
+  const { data: actual } = await supabase
+    .from('resend_accounts')
+    .select('id')
+    .eq('user_id', admin.id)
+    .maybeSingle();
 
   const apiKeyEncriptada = encryptSecret(apiKey);
   const last4 = ultimos4(apiKey);
 
-  const { error } = actual
-    ? await supabase
-        .from('resend_accounts')
-        .update({ api_key_encrypted: apiKeyEncriptada, api_key_last4: last4, validated_at: new Date().toISOString() })
-        .eq('id', actual.id)
-    : await supabase.from('resend_accounts').insert({
-        api_key_encrypted: apiKeyEncriptada,
-        api_key_last4: last4,
-      });
+  if (actual) {
+    const { error } = await supabase
+      .from('resend_accounts')
+      .update({ api_key_encrypted: apiKeyEncriptada, api_key_last4: last4, validated_at: new Date().toISOString() })
+      .eq('id', actual.id);
 
-  if (error) {
-    console.error('Error guardando la key de Resend:', error);
-    return { error: 'La clave es válida pero no se pudo guardar. Probá de nuevo.' };
+    if (error) {
+      console.error('Error guardando la key de Resend (cuenta existente):', error);
+      return { error: 'La clave es válida pero no se pudo guardar. Probá de nuevo.' };
+    }
+  } else {
+    // Primera vez que ESTE admin conecta Resend — a diferencia de Brevo,
+    // Resend exige un dominio propio verificado (no acepta un @gmail.com
+    // como remitente), así que el email de remitente es igual de
+    // obligatorio acá.
+    if (!parsed.data.sender_email) {
+      return {
+        error:
+          'Todavía no conectaste ninguna cuenta de Resend — además de la clave, completá el email de remitente (tiene que ser de un dominio que verificaste en Resend, no un @gmail.com).',
+      };
+    }
+
+    const { error } = await supabase.from('resend_accounts').insert({
+      user_id: admin.id,
+      sender_email: parsed.data.sender_email,
+      sender_name: parsed.data.sender_name || parsed.data.sender_email,
+      api_key_encrypted: apiKeyEncriptada,
+      api_key_last4: last4,
+      validated_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('Error creando la cuenta de Resend desde el panel:', error);
+      return { error: 'La clave es válida pero no se pudo guardar. Probá de nuevo.' };
+    }
   }
 
   revalidatePath('/admin/settings/integrations');
@@ -189,21 +212,88 @@ export async function conectarResend(_prevState: Resultado | undefined, formData
 }
 
 export async function desconectarResend(): Promise<Resultado> {
-  if (!(await requireAdmin())) return { error: 'No autorizado.' };
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: actual } = await supabase.from('resend_accounts').select('id').limit(1).maybeSingle();
+  const { data: actual } = await supabase
+    .from('resend_accounts')
+    .select('id')
+    .eq('user_id', admin.id)
+    .maybeSingle();
   if (!actual) return { ok: true };
 
-  // Acá sí se borra la fila entera (a diferencia de Brevo) — Resend no
-  // tiene ningún otro dato propio (sender, límites) que valga la pena
-  // conservar sin la key, es 100% la conexión y nada más.
   const { error } = await supabase.from('resend_accounts').delete().eq('id', actual.id);
 
   if (error) {
     console.error('Error desconectando Resend:', error);
     return { error: 'No se pudo desconectar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+// ── Plan pago (2026-08-26, stub a propósito) ────────────────────────
+// Sin pasarela de pago real todavía — Facundo pidió explícitamente
+// dejar el botón/campo armado para "acordarme de implementarlo a
+// futuro". Lo que SÍ es real: marcar una cuenta como plan pago y
+// declarar cuántos créditos mensuales tiene cambia de verdad el
+// cálculo de creditos_mensuales_de() (ver migración 0019) — no hace
+// falta ningún código nuevo el día que haya un plan pago real, ya
+// funciona con el número que se cargue acá.
+const planPagoSchema = z.object({
+  plan_tipo: z.enum(['free', 'pago']),
+  creditos_pago: z.coerce.number().int().min(0).optional(),
+});
+
+export async function declararPlanBrevo(formData: FormData): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const raw = Object.fromEntries(formData) as Record<string, string>;
+  const parsed = planPagoSchema.safeParse(raw);
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('brevo_accounts')
+    .update({
+      plan_tipo: parsed.data.plan_tipo,
+      creditos_pago: parsed.data.plan_tipo === 'pago' ? (parsed.data.creditos_pago ?? null) : null,
+    })
+    .eq('user_id', admin.id);
+
+  if (error) {
+    console.error('Error guardando el plan de Brevo:', error);
+    return { error: 'No se pudo guardar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+export async function declararPlanResend(formData: FormData): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const raw = Object.fromEntries(formData) as Record<string, string>;
+  const parsed = planPagoSchema.safeParse(raw);
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('resend_accounts')
+    .update({
+      plan_tipo: parsed.data.plan_tipo,
+      creditos_pago: parsed.data.plan_tipo === 'pago' ? (parsed.data.creditos_pago ?? null) : null,
+    })
+    .eq('user_id', admin.id);
+
+  if (error) {
+    console.error('Error guardando el plan de Resend:', error);
+    return { error: 'No se pudo guardar. Probá de nuevo.' };
   }
 
   revalidatePath('/admin/settings/integrations');

@@ -2,12 +2,102 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { CheckCircle2, CircleOff, ChevronDown, KeyRound, Unplug } from 'lucide-react';
+import { CheckCircle2, CircleOff, ChevronDown, KeyRound, Unplug, CreditCard } from 'lucide-react';
 import { inputClass, labelClass } from '../../FormInput';
 import { iconActionClass, IconActionGlyph } from '../../IconAction';
 
 type EstadoAccion = { error?: string; ok?: true };
 type AccionConectar = (prevState: EstadoAccion | undefined, formData: FormData) => Promise<EstadoAccion>;
+
+/**
+ * Plan pago — stub a propósito (2026-08-26, pedido explícito: "armá la
+ * opción así me acuerdo de implementarlo a futuro"). No hay pasarela de
+ * pago ni facturación real acá — es un toggle + un número a mano. Lo
+ * que SÍ es real: guardar esto cambia de verdad cuántos créditos
+ * mensuales tiene la cuenta (ver creditos_mensuales_de en la migración
+ * 0019) — el día que haya un plan pago de verdad, no hace falta tocar
+ * código, alcanza con que este número refleje lo que el proveedor da.
+ */
+function PlanPagoStub({
+  planTipo,
+  creditosPago,
+  creditosFreeCalculados,
+  onDeclarar,
+}: {
+  planTipo: 'free' | 'pago';
+  creditosPago?: number | null;
+  creditosFreeCalculados: number;
+  onDeclarar: (formData: FormData) => Promise<EstadoAccion>;
+}) {
+  const [esPago, setEsPago] = useState(planTipo === 'pago');
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+
+  return (
+    <form
+      action={async (formData) => {
+        setError(null);
+        setGuardando(true);
+        try {
+          const r = await onDeclarar(formData);
+          if (r?.error) setError(r.error);
+          else setGuardado(true);
+        } finally {
+          setGuardando(false);
+        }
+      }}
+      className="mt-4 rounded-one-sm bg-one-oscuro/5 p-4"
+    >
+      <label className="flex items-center gap-2 text-sm font-semibold text-one-oscuro">
+        <input
+          type="checkbox"
+          name="plan_tipo_checkbox"
+          checked={esPago}
+          onChange={(e) => {
+            setEsPago(e.target.checked);
+            setGuardado(false);
+          }}
+          className="size-4 rounded border-one-oscuro/30 accent-one-fucsia focus:ring-2 focus:ring-one-fucsia/20"
+        />
+        Esta es una cuenta con plan pago
+      </label>
+      <input type="hidden" name="plan_tipo" value={esPago ? 'pago' : 'free'} />
+      <p className="mt-1 text-xs text-one-oscuro/40">
+        {esPago
+          ? 'Declará cuántos créditos mensuales tiene el plan pago — reemplaza el cálculo automático del plan gratuito.'
+          : `Plan gratuito: se calculan ${creditosFreeCalculados.toLocaleString('es-AR')} créditos/mes automáticamente, sin nada que declarar acá.`}
+      </p>
+      {esPago && (
+        <div className="mt-3 max-w-xs">
+          <label className={labelClass} htmlFor="creditos_pago">
+            Créditos mensuales del plan pago
+          </label>
+          <input
+            id="creditos_pago"
+            name="creditos_pago"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={creditosPago ?? undefined}
+            placeholder="ej. 50000"
+            className={inputClass}
+          />
+        </div>
+      )}
+      {error && <p className="mt-2 text-xs font-medium text-one-rojo">{error}</p>}
+      {guardado && !error && <p className="mt-2 text-xs font-medium text-emerald-600">Guardado.</p>}
+      <button
+        type="submit"
+        disabled={guardando}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-one-oscuro/15 px-4 py-1.5 text-xs font-bold text-one-oscuro transition-colors duration-150 ease-out hover:bg-one-oscuro/10 disabled:pointer-events-none disabled:opacity-50"
+      >
+        <CreditCard className="size-3.5" strokeWidth={1.75} />
+        {guardando ? 'Guardando...' : 'Guardar plan'}
+      </button>
+    </form>
+  );
+}
 
 function BotonConectar({ texto }: { texto: string }) {
   const { pending } = useFormStatus();
@@ -42,6 +132,10 @@ export function IntegrationCard({
   onDesconectar,
   camposExtra,
   instrucciones,
+  planTipo,
+  creditosPago,
+  creditosFreeCalculados,
+  onDeclararPlan,
 }: {
   proveedor: string;
   colorAcento: 'rojo' | 'azul';
@@ -54,6 +148,10 @@ export function IntegrationCard({
   /** Campos extra que solo hacen falta en la primera conexión (ej. remitente de Brevo). */
   camposExtra?: ReactNode;
   instrucciones: ReactNode;
+  planTipo: 'free' | 'pago';
+  creditosPago?: number | null;
+  creditosFreeCalculados: number;
+  onDeclararPlan: (formData: FormData) => Promise<EstadoAccion>;
 }) {
   const [state, formAction] = useFormState(onConectar, undefined);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -153,6 +251,13 @@ export function IntegrationCard({
               <IconActionGlyph icon={Unplug} busy={desconectando} />
             </button>
           </div>
+
+          <PlanPagoStub
+            planTipo={planTipo}
+            creditosPago={creditosPago}
+            creditosFreeCalculados={creditosFreeCalculados}
+            onDeclarar={onDeclararPlan}
+          />
         </div>
       ) : (
         <div className="mt-5">

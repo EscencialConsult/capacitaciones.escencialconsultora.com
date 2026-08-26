@@ -235,7 +235,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'No se pudo guardar el lead.' }, { status: 500 });
   }
 
-  const { es_duplicado, lead_id } = resultado as { es_duplicado: boolean; lead_id: string };
+  const { es_duplicado, lead_id, sin_credito } = resultado as {
+    es_duplicado: boolean;
+    lead_id?: string;
+    sin_credito?: boolean;
+  };
+
+  // Sistema de créditos (2026-08-26, ver migración 0019) — el dueño de
+  // esta campaña se quedó sin crédito disponible en este ciclo:
+  // registrar_lead ya pausó la campaña sola (nadie más se registra
+  // detrás de este intento) y, si era una alta nueva, ni siquiera
+  // guardó el lead. Mismo shape de error que "landing no activa" —
+  // desde la perspectiva del visitante es exactamente eso, dejó de
+  // estar disponible en el momento en que llegó.
+  if (sin_credito) {
+    return NextResponse.json(
+      { ok: false, error: 'Esta campaña dejó de estar disponible en este momento.' },
+      { status: 409 }
+    );
+  }
 
   if (es_duplicado) {
     return NextResponse.json({ ok: true, duplicado: true });

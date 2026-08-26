@@ -1,7 +1,14 @@
-import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { FormInput } from '../../FormInput';
 import { IntegrationCard } from './IntegrationCard';
-import { conectarBrevo, desconectarBrevo, conectarResend, desconectarResend } from './actions';
+import {
+  conectarBrevo,
+  desconectarBrevo,
+  conectarResend,
+  desconectarResend,
+  declararPlanBrevo,
+  declararPlanResend,
+} from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,17 +92,25 @@ function InstruccionesResend() {
 }
 
 export default async function IntegrationsPage() {
+  const admin = await requireAdmin();
   const supabase = createSupabaseServiceClient();
 
+  // Por persona (2026-08-26) — cada admin conecta sus propias cuentas,
+  // ya no hay una sola fila global compartida por todo el panel. El
+  // sistema de créditos (ver migración 0019) cobra según de quién es
+  // la cuenta que activó cada campaña, así que lo que se ve/conecta
+  // acá tiene que ser exactamente lo que ESTE admin va a consumir.
   const [{ data: brevo }, { data: resend }] = await Promise.all([
     supabase
       .from('brevo_accounts')
-      .select('api_key_encrypted, api_key_last4, validated_at')
-      .eq('is_active', true)
-      .order('priority', { ascending: true })
-      .limit(1)
+      .select('api_key_encrypted, api_key_last4, validated_at, daily_limit, plan_tipo, creditos_pago')
+      .eq('user_id', admin?.id ?? '')
       .maybeSingle(),
-    supabase.from('resend_accounts').select('api_key_last4, validated_at').limit(1).maybeSingle(),
+    supabase
+      .from('resend_accounts')
+      .select('api_key_last4, validated_at, plan_tipo, creditos_pago')
+      .eq('user_id', admin?.id ?? '')
+      .maybeSingle(),
   ]);
 
   const brevoConectado = !!brevo?.api_key_encrypted;
@@ -104,8 +119,9 @@ export default async function IntegrationsPage() {
     <div className="max-w-3xl">
       <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Integraciones</h1>
       <p className="mt-1 text-sm text-one-oscuro/60">
-        Conectá las cuentas que usa la plataforma para mandar los emails de campaña. No hace falta tocar código ni
-        variables de entorno — pegá la clave acá, la validamos con el proveedor y listo.
+        Conectá tus propias cuentas para mandar los emails de las campañas que vos actives — cada admin tiene las
+        suyas, y de ahí salen tus créditos mensuales (ver Mi perfil). No hace falta tocar código ni variables de
+        entorno — pegá la clave acá, la validamos con el proveedor y listo.
       </p>
 
       <div className="mt-6 space-y-5">
@@ -120,11 +136,15 @@ export default async function IntegrationsPage() {
             onConectar={conectarBrevo}
             onDesconectar={desconectarBrevo}
             instrucciones={<InstruccionesBrevo />}
+            planTipo={(brevo?.plan_tipo as 'free' | 'pago') ?? 'free'}
+            creditosPago={brevo?.creditos_pago}
+            creditosFreeCalculados={(brevo?.daily_limit ?? 300) * 30}
+            onDeclararPlan={declararPlanBrevo}
             camposExtra={
               !brevoConectado && (
                 <div className="space-y-4 rounded-one-sm bg-one-oscuro/5 p-4">
                   <p className="text-xs text-one-oscuro/60">
-                    Todavía no hay ninguna cuenta de Brevo conectada — completá también desde dónde se van a mandar los emails.
+                    Todavía no conectaste ninguna cuenta de Brevo — completá también desde dónde se van a mandar tus emails.
                   </p>
                   <FormInput id="sender_email" name="sender_email" type="email" label="Email de remitente" placeholder="hola@escencialconsult.com.ar" required />
                   <FormInput id="sender_name" name="sender_name" label="Nombre de remitente" placeholder="Escencial Consultora" />
@@ -145,13 +165,30 @@ export default async function IntegrationsPage() {
             onConectar={conectarResend}
             onDesconectar={desconectarResend}
             instrucciones={<InstruccionesResend />}
+            planTipo={(resend?.plan_tipo as 'free' | 'pago') ?? 'free'}
+            creditosPago={resend?.creditos_pago}
+            creditosFreeCalculados={3000}
+            onDeclararPlan={declararPlanResend}
+            camposExtra={
+              !resend?.api_key_last4 && (
+                <div className="space-y-4 rounded-one-sm bg-one-oscuro/5 p-4">
+                  <p className="text-xs text-one-oscuro/60">
+                    Todavía no conectaste ninguna cuenta de Resend — completá también el remitente. Tiene que ser un
+                    email de un dominio que ya verificaste en Resend (resend.com/domains), nunca un @gmail.com.
+                  </p>
+                  <FormInput id="sender_email" name="sender_email" type="email" label="Email de remitente" placeholder="hola@tudominio.com" required />
+                  <FormInput id="sender_name" name="sender_name" label="Nombre de remitente" placeholder="Escencial Consultora" />
+                </div>
+              )
+            }
           />
         </div>
       </div>
 
       <p className="mt-6 text-xs text-one-oscuro/40">
-        Hoy la plataforma manda los emails de campaña por Brevo. Conectar Resend guarda y valida la clave para cuando
-        se habilite como proveedor alternativo — todavía no reemplaza a Brevo en los envíos reales.
+        Cuando actives una campaña, sus emails se mandan por la cuenta que tengas conectada — si tenés las dos,
+        Resend tiene prioridad (no depende de una IP autorizada, a diferencia de Brevo). Sin ninguna cuenta propia
+        conectada, no vas a poder activar ninguna campaña.
       </p>
     </div>
   );
