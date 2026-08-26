@@ -287,7 +287,8 @@ export async function updateCampaign(
   _prevState: { error?: string } | undefined,
   formData: FormData
 ) {
-  if (!(await requireAdmin())) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return { error: 'No autorizado.' };
   }
 
@@ -339,6 +340,7 @@ export async function updateCampaign(
     const { error: pauseError } = await supabase.rpc('mover_landing_y_activar', {
       p_campaign_id: campaignId,
       p_landing_id_nuevo: d.landing_id,
+      p_activated_by: admin.id,
     });
 
     if (pauseError) {
@@ -460,7 +462,8 @@ export async function activateCampaign(
   // la pantalla donde estaba viendo el estado de publicación.
   redirectTo: string = '/admin/campaigns'
 ) {
-  if (!(await requireAdmin())) {
+  const admin = await requireAdmin();
+  if (!admin) {
     return { error: 'No autorizado.' };
   }
 
@@ -482,7 +485,10 @@ export async function activateCampaign(
   // sin ningún landing_email_steps activo — red de seguridad aparte del
   // fix de createCampaign, para cualquier campaña que haya quedado sin
   // pasos por otra vía.
-  const { error } = await supabase.rpc('activar_campana', { p_campaign_id: campaignId });
+  const { error } = await supabase.rpc('activar_campana', {
+    p_campaign_id: campaignId,
+    p_activated_by: admin.id,
+  });
 
   if (error) {
     console.error('Error activando campaña:', error);
