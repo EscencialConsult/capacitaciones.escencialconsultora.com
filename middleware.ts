@@ -35,7 +35,14 @@ export async function middleware(request: NextRequest) {
     vinoPorElSecreto = true;
   }
 
-  if (pathDestino !== '/admin' && !pathDestino.startsWith('/admin/')) {
+  // La raíz del dominio (2026-08-25, pedido explícito) ya renderiza el
+  // mismo formulario de login (ver app/page.tsx) — acá solo hace falta
+  // el atajo de cortesía: si ya hay sesión activa, directo al panel en
+  // vez de mostrar el form de nuevo. Sin sesión, sigue de largo y listo
+  // (nunca 404 — a diferencia de /admin, la raíz es la puerta pública).
+  const esRaiz = pathDestino === '/';
+
+  if (pathDestino !== '/admin' && !pathDestino.startsWith('/admin/') && !esRaiz) {
     return NextResponse.next();
   }
 
@@ -60,6 +67,16 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (esRaiz) {
+    const response = user
+      ? NextResponse.redirect(new URL('/admin', request.url))
+      : NextResponse.next({ request });
+    cookiesParaRefrescar.forEach(({ name, value, options }) =>
+      response.cookies.set(name, value, options)
+    );
+    return response;
+  }
 
   const esLogin = pathDestino === '/admin/login';
 
