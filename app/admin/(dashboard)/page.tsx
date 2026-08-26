@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ClipboardList, Users, Clock, TriangleAlert } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TableShell, TableHead, TableEmptyRow } from './AdminTable';
+import { formatFechaHoraAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,7 +117,7 @@ export default async function AdminHomePage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-one-oscuro/60">
-                      {new Date(lead.created_at).toLocaleString('es-AR')}
+                      {formatFechaHoraAR(lead.created_at)}
                     </td>
                   </tr>
                 );

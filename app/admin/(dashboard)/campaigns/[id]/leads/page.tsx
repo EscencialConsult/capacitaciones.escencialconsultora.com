@@ -3,6 +3,7 @@ import { Check, Clock, X, Minus } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 import { RetryEnvioButton } from './RetryEnvioButton';
+import { formatFechaHoraAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
 
@@ -189,7 +190,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                           Sí — desde etapa {lead.whatsapp_clicked_step ?? '?'}
                         </span>
                         <span className="text-xs text-one-oscuro/40">
-                          {new Date(lead.whatsapp_clicked_at).toLocaleString('es-AR')}
+                          {formatFechaHoraAR(lead.whatsapp_clicked_at)}
                         </span>
                       </div>
                     ) : (
@@ -223,7 +224,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                           <span key={e.numero} className="inline-flex items-center gap-1">
                             <span
                               title={`Etapa ${e.numero}: ${etiquetaEtapa[e.estado] ?? e.estado}${
-                                e.fecha ? ' — ' + new Date(e.fecha).toLocaleString('es-AR') : ''
+                                e.fecha ? ' — ' + formatFechaHoraAR(e.fecha) : ''
                               }${e.errorMessage ? ' — ' + e.errorMessage : ''}`}
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${estiloEtapa[e.estado] ?? ''}`}
                             >
@@ -238,7 +239,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                     </div>
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">
-                    {new Date(lead.created_at).toLocaleString('es-AR')}
+                    {formatFechaHoraAR(lead.created_at)}
                   </td>
                 </tr>
               );

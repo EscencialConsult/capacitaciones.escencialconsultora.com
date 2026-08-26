@@ -3,6 +3,7 @@ import { UserActions } from './UserActions';
 import { CreateUserForm } from './CreateUserForm';
 import { Avatar } from '../Avatar';
 import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
+import { formatFechaHoraAR, formatFechaAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,10 +68,10 @@ export default async function UsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">
-                    {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('es-AR') : 'nunca'}
+                    {u.last_sign_in_at ? formatFechaHoraAR(u.last_sign_in_at) : 'nunca'}
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">
-                    {new Date(u.created_at).toLocaleDateString('es-AR')}
+                    {formatFechaAR(u.created_at)}
                   </td>
                   <td className="px-4 py-3">
                     <UserActions

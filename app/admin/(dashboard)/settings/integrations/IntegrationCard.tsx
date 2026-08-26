@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { CheckCircle2, CircleOff, ChevronDown, KeyRound, Unplug, CreditCard } from 'lucide-react';
 import { inputClass, labelClass } from '../../FormInput';
 import { iconActionClass, IconActionGlyph } from '../../IconAction';
+import { formatFechaLargaAR } from '@/lib/fecha';
 
 type EstadoAccion = { error?: string; ok?: true };
 type AccionConectar = (prevState: EstadoAccion | undefined, formData: FormData) => Promise<EstadoAccion>;
@@ -210,7 +211,7 @@ export function IntegrationCard({
           </p>
           {validatedAt && (
             <p className="mt-1 text-xs text-one-oscuro/40">
-              Validada el {new Date(validatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}.
+              Validada el {formatFechaLargaAR(validatedAt)}.
             </p>
           )}
           {errorDesconectar && <p className="mt-2 text-xs font-medium text-one-rojo">{errorDesconectar}</p>}

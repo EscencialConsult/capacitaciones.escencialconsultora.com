@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ToggleActivaButton } from './ToggleActivaButton';
 import { iconActionClass, IconActionGlyph } from '../IconAction';
 import { TableShell, TableHead, TableEmptyRow } from '../AdminTable';
+import { formatFechaAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,7 @@ export default async function EmailTemplatesPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-one-oscuro/60">
-                  {new Date(t.updated_at).toLocaleDateString('es-AR')}
+                  {formatFechaAR(t.updated_at)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
