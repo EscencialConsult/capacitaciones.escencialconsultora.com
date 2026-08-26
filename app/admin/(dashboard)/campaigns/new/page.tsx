@@ -23,7 +23,7 @@ export default async function NewCampaignPage() {
       <h1 className="text-2xl font-extrabold tracking-tight text-one-oscuro">Nueva campaña</h1>
       <p className="mt-1 text-sm text-one-oscuro/60">
         Queda en borrador — todavía sin servir contenido. Elegí a qué landing se conecta, cargá
-        todo, y cuando esté listo activala desde la lista de Campañas.
+        todo, y en el último paso ("Publicación") activala y confirmá que ya está en vivo.
       </p>
       <CampaignForm
         key="new"

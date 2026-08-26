@@ -450,7 +450,16 @@ export async function updateCampaign(
  * esta pausa cualquier otra que ya estuviera activa en la misma
  * landing, y prende la landing por las dudas estuviera desactivada.
  */
-export async function activateCampaign(campaignId: string) {
+export async function activateCampaign(
+  campaignId: string,
+  // A dónde volver después de activar (2026-08-26, paso "Publicación" del
+  // form) — por defecto la lista, de siempre. Cuando se activa desde
+  // adentro del form de edición, se pasa la propia URL de edición para
+  // quedarse ahí (con ?guardado=1, mismo mecanismo de "recién pasó algo,
+  // veníte a confirmar" que ya usa guardar) en vez de sacar al admin de
+  // la pantalla donde estaba viendo el estado de publicación.
+  redirectTo: string = '/admin/campaigns'
+) {
   if (!(await requireAdmin())) {
     return { error: 'No autorizado.' };
   }
@@ -482,7 +491,7 @@ export async function activateCampaign(campaignId: string) {
 
   revalidatePath('/admin/campaigns');
   revalidatePath('/admin/landings');
-  redirect('/admin/campaigns');
+  redirect(redirectTo);
 }
 
 /**

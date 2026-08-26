@@ -3,12 +3,98 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
-import { Link2, Sparkles, FileText, UserRound, ExternalLink } from 'lucide-react';
+import { Link2, Sparkles, FileText, UserRound, ExternalLink, Rocket, CheckCircle2, TriangleAlert, Loader2 } from 'lucide-react';
 import { CopyLandingPromptButton } from './CopyLandingPromptButton';
 import { NewEmailTemplateModal } from './NewEmailTemplateModal';
 import { NewLandingModal } from './NewLandingModal';
 import { NewCategoryModal } from '../templates/NewCategoryModal';
 import { FormInput, inputClass, labelClass } from '../FormInput';
+import { ActivateButton } from './ActivateButton';
+
+// Un solo color con significado real por estado — mismo criterio que
+// campaigns/page.tsx (ver ese archivo para el porqué de la paleta).
+const badgeEstadoPublicacion: Record<string, string> = {
+  draft: 'bg-one-oscuro/5 text-one-oscuro/50',
+  active: 'bg-emerald-50 text-emerald-600',
+  paused: 'bg-one-dorado/15 text-one-dorado',
+  archived: 'bg-one-oscuro/5 text-one-oscuro/40',
+};
+const textoEstadoPublicacion: Record<string, string> = {
+  draft: 'Borrador',
+  active: 'Activa',
+  paused: 'Pausada',
+  archived: 'Archivada',
+};
+
+/**
+ * Confirma en vivo que /{slug} ya está sirviendo contenido de verdad,
+ * en vez de asumirlo solo porque el estado en la base dice "active"
+ * (2026-08-26, pedido explícito: "avisá si tarda en habilitarse"). La
+ * ruta pública (app/[slug]/route.ts) es force-dynamic + no-store — no
+ * debería haber demora real — pero esto chequea de verdad en vez de
+ * prometerlo, con unos reintentos por si la primera consulta pasa
+ * justo antes de que el commit de Postgres quede visible.
+ */
+function VerificacionEnVivo({ slug }: { slug: string }) {
+  const [estado, setEstado] = useState<'chequeando' | 'ok' | 'tardando'>('chequeando');
+
+  useEffect(() => {
+    let cancelado = false;
+    let intento = 0;
+
+    async function chequear() {
+      intento++;
+      try {
+        const r = await fetch(`/${slug}`, { cache: 'no-store' });
+        if (!cancelado && r.ok) {
+          setEstado('ok');
+          return;
+        }
+      } catch {
+        // sin conexión momentánea, sigue reintentando abajo
+      }
+      if (cancelado) return;
+      if (intento >= 4) {
+        setEstado('tardando');
+        return;
+      }
+      setTimeout(chequear, 1500);
+    }
+
+    setEstado('chequeando');
+    chequear();
+    return () => {
+      cancelado = true;
+    };
+  }, [slug]);
+
+  if (estado === 'ok') {
+    return (
+      <p className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
+        <CheckCircle2 className="size-4" strokeWidth={2} />
+        Confirmado — la landing ya está sirviendo esta campaña.
+      </p>
+    );
+  }
+
+  if (estado === 'tardando') {
+    return (
+      <p className="flex items-start gap-2 text-sm font-semibold text-one-dorado">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
+        Está tardando más de lo esperado en habilitarse — probá &quot;Visualizar landing&quot; en un
+        rato. Si sigue sin aparecer, revisá que la landing en sí (no solo la campaña) esté activa en
+        /admin/landings.
+      </p>
+    );
+  }
+
+  return (
+    <p className="flex items-center gap-2 text-sm text-one-oscuro/50">
+      <Loader2 className="size-4 animate-spin" strokeWidth={2} />
+      Verificando que ya esté en vivo...
+    </p>
+  );
+}
 
 type VariableSchema = { key: string; label: string; type: 'text' | 'textarea'; description?: string };
 export type LandingConPlantilla = {
@@ -47,6 +133,7 @@ const PASOS = [
   { n: 2, label: 'Prompt IA' },
   { n: 3, label: 'Contenido' },
   { n: 4, label: 'Asesora y emails' },
+  { n: 5, label: 'Publicación' },
 ] as const;
 
 function BotonGuardar({ texto, textoPendiente }: { texto: string; textoPendiente: string }) {
@@ -241,6 +328,8 @@ export function CampaignForm({
   botonTexto,
   botonTextoPendiente,
   valoresIniciales,
+  campaignId,
+  campaignStatus,
 }: {
   landings: LandingConPlantilla[];
   emailTemplates: EmailPlantilla[];
@@ -250,6 +339,9 @@ export function CampaignForm({
   botonTexto: string;
   botonTextoPendiente: string;
   valoresIniciales?: ValoresIniciales;
+  /** Sin id (campaña nueva, todavía sin guardar) el paso 5 no tiene qué activar todavía. */
+  campaignId?: string;
+  campaignStatus?: 'draft' | 'active' | 'paused' | 'archived';
 }) {
   const [state, formAction] = useFormState(action, undefined);
   const pasoPorNumero = (n: number) => valoresIniciales?.pasos.find((p) => p.step_number === n);
@@ -261,11 +353,10 @@ export function CampaignForm({
   // "hidden" más abajo) para no perder valores no controlados al
   // cambiar de paso, y "Guardar cambios" queda disponible siempre, no
   // solo en el último paso.
-  const [pasoActivo, setPasoActivo] = useState<1 | 2 | 3 | 4>(1);
+  const [pasoActivo, setPasoActivo] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   // "¿Ya viste en vivo lo último que guardaste?" (2026-08-14, pedido de
-  // Facundo) — reemplaza el cartel verde separado que había antes: en
-  // vez de un aviso aparte, el botón "Visualizar landing" del paso 1 se
+  // Facundo) — el botón "Visualizar landing" (acá y en el paso 5) se
   // pone rosa/con punto cuando hay algo sin chequear a ojo — recién
   // guardado, o editado de nuevo después de guardar. Se apaga solo
   // cuando clickeás ese mismo botón (asumimos que ahí vas a ir a mirar).
@@ -277,7 +368,10 @@ export function CampaignForm({
   useEffect(() => {
     if (searchParams.get('guardado') === '1') {
       setCambiosSinRevisar(true);
-      setPasoActivo(1);
+      // Al paso 5 (Publicación), no al 1 (2026-08-26, pedido explícito)
+      // — recién guardaste, lo que sigue es activar/confirmar que está
+      // en vivo, no volver a ver los datos generales.
+      setPasoActivo(5);
       router.replace(pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -913,12 +1007,82 @@ export function CampaignForm({
         />
       </div>
 
+      <div className={`mt-6 space-y-6 ${pasoActivo === 5 ? '' : 'hidden'}`}>
+        <section className="rounded-one-lg bg-one-oscuro/5 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-one-oscuro">
+            <Rocket className="size-4 text-one-oscuro/40" strokeWidth={2} />
+            Publicación
+          </h2>
+
+          {!campaignId ? (
+            <p className="mt-2 text-sm text-one-oscuro/50">
+              Guardá la campaña primero (el botón de abajo) — recién ahí se puede activar y confirmar
+              que está en vivo.
+            </p>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    badgeEstadoPublicacion[campaignStatus ?? 'draft']
+                  }`}
+                >
+                  {textoEstadoPublicacion[campaignStatus ?? 'draft']}
+                </span>
+
+                {(campaignStatus === 'draft' || campaignStatus === 'paused') && landingSeleccionada && (
+                  <ActivateButton
+                    campaignId={campaignId}
+                    slug={landingSeleccionada.slug}
+                    label={campaignStatus === 'paused' ? 'Reactivar' : 'Activar'}
+                    // Vuelve a esta misma pantalla (no a la lista) — ver el
+                    // comentario en activateCampaign para el porqué.
+                    redirectTo={`/admin/campaigns/${campaignId}/edit?guardado=1`}
+                  />
+                )}
+
+                {landingSeleccionada && (
+                  <a
+                    href={`/${landingSeleccionada.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setCambiosSinRevisar(false)}
+                    className={
+                      cambiosSinRevisar
+                        ? 'flex items-center gap-2 whitespace-nowrap rounded-one-sm border border-one-fucsia/40 bg-one-fucsia/10 px-4 py-2 text-sm font-bold text-one-fucsia transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-fucsia/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40'
+                        : 'flex items-center gap-2 whitespace-nowrap rounded-one-sm border border-one-oscuro/15 px-4 py-2 text-sm font-bold text-one-oscuro transition-[transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40'
+                    }
+                  >
+                    {cambiosSinRevisar && <span className="size-2 flex-none rounded-full bg-one-fucsia" />}
+                    <ExternalLink className="size-4" strokeWidth={1.75} />
+                    Visualizar landing
+                  </a>
+                )}
+              </div>
+
+              {campaignStatus === 'active' && landingSeleccionada && (
+                <div className="mt-4">
+                  <VerificacionEnVivo slug={landingSeleccionada.slug} />
+                </div>
+              )}
+
+              {campaignStatus === 'archived' && (
+                <p className="mt-4 text-sm text-one-oscuro/50">
+                  Esta campaña está archivada — no se puede reactivar. Creá una campaña nueva si hace
+                  falta retomar esto.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+
       {state?.error && <p className="mt-6 text-sm text-one-rojo">{state.error}</p>}
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => setPasoActivo((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3) : p))}
+          onClick={() => setPasoActivo((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3 | 4) : p))}
           className={`rounded-full px-5 py-2.5 text-sm font-bold text-one-oscuro/70 transition-colors duration-200 ease-out hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40 ${
             pasoActivo === 1 ? 'invisible' : ''
           }`}
@@ -926,10 +1090,10 @@ export function CampaignForm({
           ← Anterior
         </button>
         <div className="flex items-center gap-3">
-          {pasoActivo < 4 && (
+          {pasoActivo < 5 && (
             <button
               type="button"
-              onClick={() => setPasoActivo((p) => (p < 4 ? ((p + 1) as 2 | 3 | 4) : p))}
+              onClick={() => setPasoActivo((p) => (p < 5 ? ((p + 1) as 2 | 3 | 4 | 5) : p))}
               className="rounded-full border border-one-oscuro/15 px-5 py-2.5 text-sm font-bold text-one-oscuro transition-colors duration-200 ease-out hover:bg-one-oscuro/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-one-fucsia/40"
             >
               Siguiente →

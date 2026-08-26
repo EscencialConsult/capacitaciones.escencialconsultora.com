@@ -9,11 +9,14 @@ export function ActivateButton({
   campaignId,
   slug,
   label = 'Activar',
+  redirectTo,
 }: {
   campaignId: string;
   slug: string;
   /** "Activar" para una en borrador, "Reactivar" para una pausada — mismo botón, mismo action. */
   label?: string;
+  /** A dónde volver después de activar — sin esto, la lista de campañas (comportamiento de siempre). */
+  redirectTo?: string;
 }) {
   const [, startTransition] = useTransition();
   // Booleano manual en vez de depender de `pending` de useTransition: `pending`
@@ -43,7 +46,7 @@ export function ActivateButton({
           setBusy(true);
           startTransition(async () => {
             try {
-              const r = await activateCampaign(campaignId);
+              const r = await activateCampaign(campaignId, redirectTo);
               if (r?.error) setError(r.error);
             } catch {
               // La Server Action rechazó (corte de red, timeout) en vez de devolver

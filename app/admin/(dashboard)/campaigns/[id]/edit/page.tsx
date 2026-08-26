@@ -61,6 +61,8 @@ export default async function EditCampaignPage({ params }: { params: { id: strin
         action={accionConId}
         botonTexto="Guardar cambios"
         botonTextoPendiente="Guardando..."
+        campaignId={campana.id}
+        campaignStatus={campana.status as 'draft' | 'active' | 'paused' | 'archived'}
         valoresIniciales={{
           name: campana.name,
           landing_id: campana.landing_id,
