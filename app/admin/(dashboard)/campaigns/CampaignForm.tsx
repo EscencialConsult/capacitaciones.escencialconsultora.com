@@ -27,18 +27,29 @@ const textoEstadoPublicacion: Record<string, string> = {
 };
 
 /**
- * Confirma en vivo que /{slug} ya está sirviendo contenido de verdad,
- * en vez de asumirlo solo porque el estado en la base dice "active"
- * (2026-08-26, pedido explícito: "avisá si tarda en habilitarse"). La
- * ruta pública (app/[slug]/route.ts) es force-dynamic + no-store — no
- * debería haber demora real — pero esto chequea de verdad en vez de
- * prometerlo, con unos reintentos por si la primera consulta pasa
- * justo antes de que el commit de Postgres quede visible.
+ * Badge de estado del paso Publicación — para 'active' NO confía en el
+ * campo de la base a ciegas: confirma con un fetch real a /{slug} que
+ * la landing está sirviendo contenido de verdad antes de decir
+ * "Activa" (2026-08-26, bug real reportado: una campaña con status
+ * 'active' en la base seguía mostrándose como si no lo estuviera —
+ * quedaba la duda de si el link ya andaba o no). Mientras no está
+ * confirmado dice "En proceso", nunca "Activa" sin haberlo chequeado.
+ * La ruta pública (app/[slug]/route.ts) es force-dynamic + no-store —
+ * no debería haber demora real — pero esto lo verifica en vez de
+ * prometerlo, con reintentos por si la primera consulta pasa justo
+ * antes de que el commit de Postgres quede visible.
  */
-function VerificacionEnVivo({ slug }: { slug: string }) {
-  const [estado, setEstado] = useState<'chequeando' | 'ok' | 'tardando'>('chequeando');
+function EstadoPublicacion({
+  campaignStatus,
+  slug,
+}: {
+  campaignStatus: 'draft' | 'active' | 'paused' | 'archived';
+  slug?: string;
+}) {
+  const [enVivo, setEnVivo] = useState<'chequeando' | 'ok' | 'tardando'>('chequeando');
 
   useEffect(() => {
+    if (campaignStatus !== 'active' || !slug) return;
     let cancelado = false;
     let intento = 0;
 
@@ -47,7 +58,7 @@ function VerificacionEnVivo({ slug }: { slug: string }) {
       try {
         const r = await fetch(`/${slug}`, { cache: 'no-store' });
         if (!cancelado && r.ok) {
-          setEstado('ok');
+          setEnVivo('ok');
           return;
         }
       } catch {
@@ -55,44 +66,62 @@ function VerificacionEnVivo({ slug }: { slug: string }) {
       }
       if (cancelado) return;
       if (intento >= 4) {
-        setEstado('tardando');
+        setEnVivo('tardando');
         return;
       }
       setTimeout(chequear, 1500);
     }
 
-    setEstado('chequeando');
+    setEnVivo('chequeando');
     chequear();
     return () => {
       cancelado = true;
     };
-  }, [slug]);
+  }, [campaignStatus, slug]);
 
-  if (estado === 'ok') {
+  // Borrador/pausada/archivada no pretenden estar sirviendo nada — su
+  // badge no depende de ningún chequeo, es directo de la base.
+  if (campaignStatus !== 'active') {
     return (
-      <p className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
-        <CheckCircle2 className="size-4" strokeWidth={2} />
-        Confirmado — la landing ya está sirviendo esta campaña.
-      </p>
+      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeEstadoPublicacion[campaignStatus]}`}>
+        {textoEstadoPublicacion[campaignStatus]}
+      </span>
     );
   }
 
-  if (estado === 'tardando') {
+  if (enVivo === 'ok') {
     return (
-      <p className="flex items-start gap-2 text-sm font-semibold text-one-dorado">
-        <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-        Está tardando más de lo esperado en habilitarse — probá &quot;Visualizar landing&quot; en un
-        rato. Si sigue sin aparecer, revisá que la landing en sí (no solo la campaña) esté activa en
-        /admin/landings.
-      </p>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+        <CheckCircle2 className="size-3.5" strokeWidth={2.5} />
+        Activa — confirmado en vivo
+      </span>
+    );
+  }
+
+  if (enVivo === 'tardando') {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span
+          className="inline-flex w-fit items-center gap-1.5 rounded-full bg-one-rojo/10 px-3 py-1 text-xs font-semibold text-one-rojo"
+          title={slug ? `/${slug} no respondió bien` : undefined}
+        >
+          <TriangleAlert className="size-3.5" strokeWidth={2.5} />
+          No se pudo confirmar
+        </span>
+        <p className="text-xs text-one-oscuro/50">
+          La base dice que está activa, pero el link no respondió — revisá que la landing en sí (no
+          solo la campaña) esté activa en /admin/landings, o probá &quot;Visualizar landing&quot; en un
+          rato.
+        </p>
+      </div>
     );
   }
 
   return (
-    <p className="flex items-center gap-2 text-sm text-one-oscuro/50">
-      <Loader2 className="size-4 animate-spin" strokeWidth={2} />
-      Verificando que ya esté en vivo...
-    </p>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-one-dorado/15 px-3 py-1 text-xs font-semibold text-one-dorado">
+      <Loader2 className="size-3.5 animate-spin" strokeWidth={2.5} />
+      En proceso...
+    </span>
   );
 }
 
@@ -1022,13 +1051,7 @@ export function CampaignForm({
           ) : (
             <>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    badgeEstadoPublicacion[campaignStatus ?? 'draft']
-                  }`}
-                >
-                  {textoEstadoPublicacion[campaignStatus ?? 'draft']}
-                </span>
+                <EstadoPublicacion campaignStatus={campaignStatus ?? 'draft'} slug={landingSeleccionada?.slug} />
 
                 {(campaignStatus === 'draft' || campaignStatus === 'paused') && landingSeleccionada && (
                   <ActivateButton
@@ -1059,12 +1082,6 @@ export function CampaignForm({
                   </a>
                 )}
               </div>
-
-              {campaignStatus === 'active' && landingSeleccionada && (
-                <div className="mt-4">
-                  <VerificacionEnVivo slug={landingSeleccionada.slug} />
-                </div>
-              )}
 
               {campaignStatus === 'archived' && (
                 <p className="mt-4 text-sm text-one-oscuro/50">
