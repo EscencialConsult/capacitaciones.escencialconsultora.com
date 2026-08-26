@@ -31,9 +31,27 @@ export default async (req: Request) => {
     return new Response(null, { status: 403 });
   }
 
-  const resultado = await processPendingEmails();
-  console.log('process-pending-emails-background:', resultado);
-  return new Response(JSON.stringify(resultado), {
-    headers: { 'content-type': 'application/json' },
-  });
+  try {
+    const resultado = await processPendingEmails();
+    console.log('process-pending-emails-background:', resultado);
+    return new Response(JSON.stringify(resultado), {
+      headers: { 'content-type': 'application/json' },
+    });
+  } catch (err) {
+    // Bug real reportado (2026-08-26) — un envío quedaba en 'processing'
+    // para siempre, sin error ni éxito, y no había NINGÚN rastro de por
+    // qué: una excepción sin capturar en processPendingEmails() mataba
+    // toda la función en silencio (Netlify no manda esto a ningún lado
+    // que el panel pueda leer). Este catch es la diferencia entre "no
+    // sabemos qué pasó" y un mensaje real en /admin (vía system_alerts).
+    const mensaje = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
+    console.error('process-pending-emails-background: excepción no capturada:', mensaje);
+    const { createSupabaseServiceClient } = await import('../../lib/supabase/server');
+    const supabase = createSupabaseServiceClient();
+    await supabase.from('system_alerts').upsert(
+      { source: 'email_background_crash', message: mensaje, last_seen_at: new Date().toISOString(), resolved_at: null },
+      { onConflict: 'source' }
+    );
+    return new Response(null, { status: 500 });
+  }
 };
