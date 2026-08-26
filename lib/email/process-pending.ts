@@ -145,27 +145,9 @@ async function resolverCuentaDeEnvio(
   return null;
 }
 
-/**
- * Diagnóstico temporal (2026-08-26) — un envío quedaba en 'processing'
- * indefinidamente (>10 min) sin tirar ninguna excepción ni terminar,
- * y un catch de nivel superior tampoco vio nada (ver
- * process-pending-emails-background.ts). Esto deja un rastro paso a
- * paso en system_alerts (se pisa a sí mismo, mismo source) para ver
- * en qué línea exacta se queda colgado. Borrar junto con
- * netlify/functions/diagnostico-background.ts una vez resuelto.
- */
-async function registrarPaso(supabase: ReturnType<typeof createSupabaseServiceClient>, texto: string) {
-  console.log('processPendingEmails paso:', texto);
-  await supabase.from('system_alerts').upsert(
-    { source: 'diagnostico_process_pending', message: texto, last_seen_at: new Date().toISOString(), resolved_at: null },
-    { onConflict: 'source' }
-  );
-}
-
 export async function processPendingEmails() {
   const supabase = createSupabaseServiceClient();
   const resultado = { procesados: 0, enviados: 0, errores: 0, omitidos: 0 };
-  await registrarPaso(supabase, 'arrancó processPendingEmails');
 
   // Bug real confirmado (2026-08-24, Ronda 3) — recuperación de filas
   // huérfanas: si un proceso anterior murió justo después de reclamar
@@ -187,7 +169,6 @@ export async function processPendingEmails() {
   if (recuperados && recuperados.length > 0) {
     console.warn(`processPendingEmails: se recuperaron ${recuperados.length} fila(s) de email_sends huérfanas en 'processing'.`);
   }
-  await registrarPaso(supabase, `recuperación de huérfanas ok (${recuperados?.length ?? 0})`);
 
   const { data: pendientes, error } = await supabase
     .from('email_sends')
@@ -203,14 +184,12 @@ export async function processPendingEmails() {
     console.error('Error leyendo email_sends pendientes:', error);
     return resultado;
   }
-  await registrarPaso(supabase, `SELECT pendientes ok (${pendientes?.length ?? 0} filas)`);
 
   const webappUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
   const cacheCuentas = new Map<string, CuentaEnvio | null>();
 
   for (const envio of pendientes ?? []) {
     resultado.procesados++;
-    await registrarPaso(supabase, `loop item ${resultado.procesados}/${pendientes?.length ?? 0} (${envio.id}) — arrancó`);
 
     const lead = envio.leads as unknown as {
       email: string;
@@ -251,9 +230,7 @@ export async function processPendingEmails() {
       continue;
     }
 
-    await registrarPaso(supabase, `item ${envio.id} — antes de resolverCuentaDeEnvio (activated_by=${lead.campaigns.activated_by})`);
     const cuenta = await resolverCuentaDeEnvio(supabase, lead.campaigns.activated_by, cacheCuentas);
-    await registrarPaso(supabase, `item ${envio.id} — resolverCuentaDeEnvio devolvió ${cuenta ? cuenta.proveedor : 'null'}`);
 
     if (!cuenta) {
       const mensaje = lead.campaigns.activated_by
@@ -282,7 +259,6 @@ export async function processPendingEmails() {
     if (!claimed || claimed.length === 0) {
       continue;
     }
-    await registrarPaso(supabase, `item ${envio.id} — reclamado, arrancando envío por ${cuenta.proveedor}`);
 
     try {
       const whatsappUrl = `${webappUrl}/api/track?lead_id=${envio.lead_id}&step=${paso.step_number}`;
@@ -319,31 +295,43 @@ export async function processPendingEmails() {
               subject: paso.subject,
               htmlContent: html,
             });
-      await registrarPaso(supabase, `item ${envio.id} — envío por ${cuenta.proveedor} respondió ok, guardando 'sent'`);
 
-      await supabase
+      // Bug real confirmado (2026-08-26, causa raíz de "queda en
+      // processing para siempre") — brevo_account_id tiene FK a
+      // brevo_accounts(id). Guardar ahí un id de resend_accounts
+      // (reutilizando la columna como slot genérico) violaba esa FK:
+      // el UPDATE fallaba con 23503, y como nunca se revisaba el
+      // `error` de este .update() en particular, el código seguía de
+      // largo como si hubiera funcionado — el email salía de verdad,
+      // pero la fila nunca se marcaba 'sent'. Ahora cada proveedor
+      // tiene su propia columna (resend_account_id, migración 0022) y
+      // el error del UPDATE se revisa como cualquier otro fallo: si no
+      // se pudo dejar constancia de un envío que sí salió, es un error
+      // real (mejor investigarlo a mano que reportarlo como éxito).
+      const { error: errorGuardado } = await supabase
         .from('email_sends')
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
           provider: cuenta.proveedor,
-          // Reutilizamos brevo_message_id/brevo_account_id como el slot
-          // genérico de "id del mensaje / cuenta que mandó" (nombre de
-          // la era en que solo existía Brevo) — provider de arriba es lo
-          // que desambigua a cuál proveedor corresponden estos dos.
           brevo_message_id: cuerpo.messageId ?? null,
-          brevo_account_id: cuenta.cuentaId,
+          brevo_account_id: cuenta.proveedor === 'brevo' ? cuenta.cuentaId : null,
+          resend_account_id: cuenta.proveedor === 'resend' ? cuenta.cuentaId : null,
         })
         .eq('id', envio.id);
 
+      if (errorGuardado) {
+        throw new Error(
+          `El email salió por ${cuenta.proveedor} pero no se pudo guardar como 'sent': ${errorGuardado.message}`
+        );
+      }
+
       resultado.enviados++;
     } catch (err) {
-      await registrarPaso(supabase, `item ${envio.id} — cayó en catch: ${err instanceof Error ? err.message : String(err)}`);
       await marcarError(supabase, envio.id, err instanceof Error ? err.message : String(err));
       resultado.errores++;
     }
   }
-  await registrarPaso(supabase, `terminó el loop — ${JSON.stringify(resultado)}`);
 
   return resultado;
 }

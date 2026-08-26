@@ -1,0 +1,11 @@
+-- Bug real confirmado (2026-08-26) — causa raíz del "queda en processing
+-- para siempre": brevo_account_id tiene FK a brevo_accounts(id). Cuando
+-- el envío sale por Resend, process-pending.ts guardaba el id de
+-- resend_accounts en esa misma columna (reutilizándola como slot
+-- genérico) — Postgres rechaza el UPDATE con 23503 (foreign key
+-- violation), y como el código no revisaba el error de ese UPDATE en
+-- particular, seguía de largo como si hubiera funcionado: el email
+-- salía de verdad, pero la fila nunca se marcaba 'sent' y quedaba
+-- 'processing' para siempre. Columna separada, con su propia FK real,
+-- en vez de reutilizar una columna con nombre de otro proveedor.
+alter table email_sends add column resend_account_id uuid references resend_accounts(id);
