@@ -3,6 +3,7 @@ import { Check, Clock, X, Minus } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 import { RetryEnvioButton } from './RetryEnvioButton';
+import { DescargarLeadsButton } from './DescargarLeadsButton';
 import { formatFechaHoraAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
@@ -94,16 +95,23 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
       >
         ← Volver a campañas
       </Link>
-      <h1 className="mt-2 flex flex-wrap items-center gap-3 text-2xl font-extrabold tracking-tight text-one-oscuro">
-        Leads — {campana?.name ?? '...'}
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-            estaActiva ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/50'
-          }`}
-        >
-          ¿Activa? {estaActiva ? 'Sí' : 'No'}
-        </span>
-      </h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="flex flex-wrap items-center gap-3 text-2xl font-extrabold tracking-tight text-one-oscuro">
+          Leads — {campana?.name ?? '...'}
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              estaActiva ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/50'
+            }`}
+          >
+            ¿Activa? {estaActiva ? 'Sí' : 'No'}
+          </span>
+        </h1>
+        <DescargarLeadsButton
+          leads={leads ?? []}
+          nombreCampana={campana?.name ?? 'campana'}
+          esEnvioPersonalizado={esEnvioPersonalizado}
+        />
+      </div>
       <p className="mt-1 text-sm text-one-oscuro/60">
         Landing: <span className="font-semibold text-one-oscuro">{landing ? `/${landing.slug}` : '—'}</span>
         {' · '}

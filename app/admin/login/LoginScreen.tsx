@@ -1,16 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { useFormState, useFormStatus } from 'react-dom';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
-import { signIn } from './actions';
+import { Mail, Lock, ArrowRight, User } from 'lucide-react';
+import { signIn, registrarAdmin } from './actions';
 import { AuthInput } from './AuthInput';
 
 // Estructura clonada de AuthLayout.jsx + AuthPage.jsx (COMRURAL): split-screen
 // con una foto de fondo cubriendo todo el panel, izquierda nítida (marca +
 // propuesta), derecha tapada con vidrio translúcido (glassmorphism) para
 // que el form sea legible. Colores/tipografía: kit ONE, no el de COMRURAL.
-function BotonEntrar() {
+function BotonSubmit({ texto, textoPendiente }: { texto: string; textoPendiente: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -19,10 +20,10 @@ function BotonEntrar() {
       className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-one-fucsia px-6 py-3 text-sm font-bold text-one-negro transition-transform duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? (
-        'Entrando...'
+        textoPendiente
       ) : (
         <>
-          Entrar
+          {texto}
           <ArrowRight className="size-4" strokeWidth={2.5} />
         </>
       )}
@@ -30,12 +31,52 @@ function BotonEntrar() {
   );
 }
 
-// Compartido por /admin/login y por la raíz del dominio (app/page.tsx,
-// 2026-08-25, pedido explícito) — un solo formulario, dos puertas de
-// entrada. La lógica de sesión/redirect sigue siendo la misma
-// (signIn en actions.ts), esto es solo la UI.
-export function LoginScreen() {
+function FormLogin() {
   const [state, formAction] = useFormState(signIn, undefined);
+  return (
+    <form action={formAction} className="mt-8 flex flex-col gap-4">
+      {state?.error && (
+        <p className="rounded-one-sm border border-one-rojo/40 bg-one-rojo/10 px-3 py-2 text-sm text-one-blanco">
+          {state.error}
+        </p>
+      )}
+      <AuthInput icon={Mail} id="email" name="email" label="Email" type="email" required autoComplete="username" placeholder="tu@email.com" />
+      <AuthInput icon={Lock} id="password" name="password" label="Contraseña" type="password" required autoComplete="current-password" placeholder="Tu contraseña" />
+      <BotonSubmit texto="Entrar" textoPendiente="Entrando..." />
+    </form>
+  );
+}
+
+// Sin candado, a propósito (2026-08-27, pedido explícito) — cualquiera
+// que complete esto se crea una cuenta de administrador con acceso
+// completo al panel. Facundo lo eligió después de que le expliqué el
+// riesgo real (no hay invitación ni aprobación de por medio).
+function FormRegistro() {
+  const [state, formAction] = useFormState(registrarAdmin, undefined);
+  return (
+    <form action={formAction} className="mt-8 flex flex-col gap-4">
+      {state?.error && (
+        <p className="rounded-one-sm border border-one-rojo/40 bg-one-rojo/10 px-3 py-2 text-sm text-one-blanco">
+          {state.error}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <AuthInput icon={User} id="nombre" name="nombre" label="Nombre" required autoComplete="given-name" placeholder="Tu nombre" />
+        <AuthInput id="apellido" name="apellido" label="Apellido" required autoComplete="family-name" placeholder="Tu apellido" />
+      </div>
+      <AuthInput icon={Mail} id="reg_email" name="email" label="Email" type="email" required autoComplete="username" placeholder="tu@email.com" />
+      <AuthInput icon={Lock} id="reg_password" name="password" label="Contraseña" type="password" required minLength={6} autoComplete="new-password" placeholder="Mínimo 6 caracteres" />
+      <BotonSubmit texto="Crear cuenta" textoPendiente="Creando..." />
+    </form>
+  );
+}
+
+// Compartido por /admin/login y por la raíz del dominio (app/page.tsx,
+// 2026-08-25). El registro (`mostrarRegistro`) solo se ofrece desde la
+// raíz — pedido explícito 2026-08-27 ("registrarse desde inicio"), no
+// desde /admin/login.
+export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boolean }) {
+  const [modo, setModo] = useState<'login' | 'registro'>('login');
 
   return (
     <div className="relative min-h-svh overflow-hidden bg-one-oscuro md:h-svh">
@@ -120,40 +161,23 @@ export function LoginScreen() {
             />
 
             <h1 className="bg-gradient-to-r from-one-fucsia to-one-cian bg-clip-text text-2xl font-extrabold text-transparent">
-              Bienvenido
+              {modo === 'login' ? 'Bienvenido' : 'Creá tu cuenta'}
             </h1>
-            <p className="mt-1 text-sm text-one-lavanda">Ingresá tus credenciales para continuar.</p>
+            <p className="mt-1 text-sm text-one-lavanda">
+              {modo === 'login' ? 'Ingresá tus credenciales para continuar.' : 'Acceso completo al panel de administración.'}
+            </p>
 
-            <form action={formAction} className="mt-8 flex flex-col gap-4">
-              {state?.error && (
-                <p className="rounded-one-sm border border-one-rojo/40 bg-one-rojo/10 px-3 py-2 text-sm text-one-blanco">
-                  {state.error}
-                </p>
-              )}
+            {modo === 'login' ? <FormLogin /> : <FormRegistro />}
 
-              <AuthInput
-                icon={Mail}
-                id="email"
-                name="email"
-                label="Email"
-                type="email"
-                required
-                autoComplete="username"
-                placeholder="tu@email.com"
-              />
-              <AuthInput
-                icon={Lock}
-                id="password"
-                name="password"
-                label="Contraseña"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="Tu contraseña"
-              />
-
-              <BotonEntrar />
-            </form>
+            {mostrarRegistro && (
+              <button
+                type="button"
+                onClick={() => setModo((m) => (m === 'login' ? 'registro' : 'login'))}
+                className="mt-6 text-center text-sm font-semibold text-one-lavanda transition-colors duration-150 hover:text-one-fucsia"
+              >
+                {modo === 'login' ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Iniciá sesión'}
+              </button>
+            )}
           </div>
         </div>
       </div>
