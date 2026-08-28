@@ -144,6 +144,15 @@ type PasoExistente = {
   offset_days: number;
   subject: string;
   content: string;
+  // 'lead' (default, de siempre) = offset_days contado desde que SE
+  // REGISTRA este lead puntual. 'campana' (2026-08-28, pedido explícito)
+  // = offset_days contado desde que la CAMPAÑA se activó, igual para
+  // todos los leads — con la regla de que si esa fecha ya pasó para
+  // cuando alguien se registra, ese paso se saltea (nunca se manda
+  // atrasado). Solo aplica a los pasos 2-4: el paso 1 (offset 0) siempre
+  // es inmediato al registro, sea cual sea su ancla, así que no tiene
+  // sentido ofrecerle el selector.
+  ancla?: 'lead' | 'campana';
 };
 
 type ValoresIniciales = {
@@ -309,6 +318,31 @@ function BloqueEmail({
           <input type="hidden" name={`step${numero}_offset_days`} defaultValue={valores?.offset_days ?? 0} />
         )}
       </div>
+      {/* Ancla del offset (2026-08-28, pedido explícito) — solo tiene
+          sentido para los pasos 2-4: el paso 1 es siempre offset 0,
+          inmediato al registro, no hay nada que anclar. Tampoco aplica en
+          envío personalizado (ahí el envío es siempre al instante, sin
+          offset real). */}
+      {!envioPersonalizado && numero !== 1 && (
+        <div className="mt-3">
+          <label className={labelClass} htmlFor={`step${numero}_ancla`}>
+            Contado desde
+          </label>
+          <select
+            id={`step${numero}_ancla`}
+            name={`step${numero}_ancla`}
+            defaultValue={valores?.ancla ?? 'lead'}
+            className={inputClass}
+          >
+            <option value="lead">El registro de cada lead (de siempre)</option>
+            <option value="campana">Una fecha fija de la campaña (el mismo día para todos)</option>
+          </select>
+          <p className="mt-1 text-xs text-one-oscuro/40">
+            Con fecha fija: si para cuando alguien se registra esa fecha ya pasó, este paso se
+            saltea para esa persona — nunca se manda atrasado.
+          </p>
+        </div>
+      )}
       <div className="mt-4">
         {/* Sin "required" HTML5 a propósito (2026-08-14): con el form
             dividido en pasos/tabs, un campo obligatorio escondido en un

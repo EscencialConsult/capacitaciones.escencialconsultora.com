@@ -24,7 +24,7 @@ export default async function EditCampaignPage({ params }: { params: { id: strin
         .single(),
       supabase
         .from('landing_email_steps')
-        .select('step_number, email_template_id, offset_days, subject, content')
+        .select('step_number, email_template_id, offset_days, subject, content, ancla')
         .eq('campaign_id', params.id)
         .order('step_number', { ascending: true }),
       supabase

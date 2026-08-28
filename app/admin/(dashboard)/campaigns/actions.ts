@@ -53,6 +53,13 @@ const campaignSchema = z.object({
   step4_offset_days: z.coerce.number().int().min(0).default(0),
   step4_subject: z.string().trim().optional().default(''),
   step4_content: z.string().trim().optional().default(''),
+  // Ancla del offset (2026-08-28, pedido explícito) — solo pasos 2-4,
+  // ver el comentario completo en CampaignForm.tsx → PasoExistente. El
+  // paso 1 nunca lo manda el form (offset siempre 0, inmediato), así
+  // que ni se le pide acá — parsePasos lo hardcodea a 'lead' abajo.
+  step2_ancla: z.enum(['lead', 'campana']).default('lead'),
+  step3_ancla: z.enum(['lead', 'campana']).default('lead'),
+  step4_ancla: z.enum(['lead', 'campana']).default('lead'),
 });
 
 /**
@@ -156,10 +163,10 @@ export async function obtenerVariablesSchemaFrescas(
 
 function parsePasos(d: z.infer<typeof campaignSchema>) {
   return [
-    { n: 1, email_template_id: d.step1_email_template_id, offset_days: d.step1_offset_days, subject: d.step1_subject, content: d.step1_content },
-    { n: 2, email_template_id: d.step2_email_template_id, offset_days: d.step2_offset_days, subject: d.step2_subject, content: d.step2_content },
-    { n: 3, email_template_id: d.step3_email_template_id, offset_days: d.step3_offset_days, subject: d.step3_subject, content: d.step3_content },
-    { n: 4, email_template_id: d.step4_email_template_id, offset_days: d.step4_offset_days, subject: d.step4_subject, content: d.step4_content },
+    { n: 1, email_template_id: d.step1_email_template_id, offset_days: d.step1_offset_days, subject: d.step1_subject, content: d.step1_content, ancla: 'lead' as const },
+    { n: 2, email_template_id: d.step2_email_template_id, offset_days: d.step2_offset_days, subject: d.step2_subject, content: d.step2_content, ancla: d.step2_ancla },
+    { n: 3, email_template_id: d.step3_email_template_id, offset_days: d.step3_offset_days, subject: d.step3_subject, content: d.step3_content, ancla: d.step3_ancla },
+    { n: 4, email_template_id: d.step4_email_template_id, offset_days: d.step4_offset_days, subject: d.step4_subject, content: d.step4_content, ancla: d.step4_ancla },
   ].filter((p) => p.n === 1 || (p.subject.trim() !== '' && p.content.trim() !== ''));
 }
 
@@ -254,6 +261,7 @@ export async function createCampaign(_prevState: { error?: string } | undefined,
       offset_days: p.offset_days,
       subject: p.subject,
       content: p.content,
+      ancla: p.ancla,
     })),
   });
 
@@ -398,6 +406,7 @@ export async function updateCampaign(
       offset_days: p.offset_days,
       subject: p.subject,
       content: p.content,
+      ancla: p.ancla,
     })),
     { onConflict: 'campaign_id,step_number' }
   );
