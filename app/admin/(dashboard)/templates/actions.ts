@@ -10,12 +10,21 @@ import {
   type DescripcionVariable,
 } from '@/lib/landing-template-defaults';
 
+const MARCAS_FIJAS = ['one', 'escencial-latam', 'escencial-argentina', 'esseleccion'] as const;
+
 const templateSchema = z.object({
   name: z.string().trim().min(1, 'Falta el nombre de la plantilla.'),
-  // Marca con identidad fija (paleta/tipografía/logos) — ver
-  // lib/landing-template-defaults.ts → MARCAS. Vacío = plantilla
-  // genérica sin marca fija, mismo comportamiento de siempre.
-  marca: z.enum(['one', 'escencial-latam', 'escencial-argentina', 'esseleccion']).optional().or(z.literal('')),
+  // Marca — codificada en un solo campo desde el <select> de
+  // TemplateForm.tsx (2026-08-28, pedido explícito: "no debe permitir
+  // cargar la plantilla si no se ha colocado la marca"): 'none' = sin
+  // marca fija a propósito (elección explícita, sigue siendo un caso
+  // válido — estilo 100% libre, ver armarPromptPlantillaNueva), un slug
+  // de MARCAS_FIJAS = una de las 4 marcas fijas del sistema, o
+  // "custom:<uuid>" = una marca creada desde /admin/marcas. Vacío ya NO
+  // es una opción válida — el <select> tiene un placeholder disabled
+  // para forzar una elección real, y este .min(1) es el respaldo del
+  // lado del servidor si alguien lo saltea (ej. un POST directo).
+  marca: z.string().trim().min(1, 'Elegí una marca (o "Sin marca fija" si el diseño es libre).'),
   html_content: z.string().min(1, 'Falta el HTML de la plantilla.'),
   is_active: z.enum(['true', 'false']),
   // Bloque B del prompt de plantilla (opcional) — label + descripción
@@ -42,12 +51,36 @@ const templateSchema = z.object({
  * nunca agrega ni saca variables por su cuenta — la única fuente de
  * verdad de QUÉ variables existen es el HTML.
  */
+/**
+ * Decodifica el valor único del <select> de marca — ver el comentario
+ * de templateSchema.marca arriba para el formato de cada caso.
+ */
+function parseMarca(
+  raw: string
+): { marca: string | null; marca_personalizada_id: string | null } | { error: string } {
+  if (raw === 'none') return { marca: null, marca_personalizada_id: null };
+  if (raw.startsWith('custom:')) {
+    const id = raw.slice('custom:'.length);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return { error: 'Marca inválida.' };
+    }
+    return { marca: null, marca_personalizada_id: id };
+  }
+  if ((MARCAS_FIJAS as readonly string[]).includes(raw)) {
+    return { marca: raw, marca_personalizada_id: null };
+  }
+  return { error: 'Marca inválida.' };
+}
+
 function parseTemplateForm(formData: FormData) {
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const parsed = templateSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' } as const;
   }
+
+  const marcaResuelta = parseMarca(parsed.data.marca);
+  if ('error' in marcaResuelta) return { error: marcaResuelta.error } as const;
 
   let descripciones: Record<string, DescripcionVariable> | undefined;
   if (parsed.data.variables_meta) {
@@ -68,7 +101,8 @@ function parseTemplateForm(formData: FormData) {
   return {
     data: {
       name: parsed.data.name,
-      marca: parsed.data.marca || null,
+      marca: marcaResuelta.marca,
+      marca_personalizada_id: marcaResuelta.marca_personalizada_id,
       html_content: parsed.data.html_content,
       variables_schema: combinarVariables(detectadas, descripciones),
       is_active: parsed.data.is_active === 'true',

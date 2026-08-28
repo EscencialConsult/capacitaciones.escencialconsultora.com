@@ -1,9 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { armarPromptPlantillaNueva, type Marca } from '@/lib/landing-template-defaults';
+import { armarPromptPlantillaNueva, type Marca, type MarcaPersonalizada } from '@/lib/landing-template-defaults';
 
-export function CopyPromptButton({ marca, envioPersonalizado }: { marca: Marca | null; envioPersonalizado: boolean }) {
+export function CopyPromptButton({
+  marca,
+  marcaPersonalizada = null,
+  envioPersonalizado,
+}: {
+  marca: Marca | null;
+  // Marca creada desde /admin/marcas, ya resuelta (mismo criterio que
+  // el resto del sistema: datos planos cruzando de Server a Client
+  // Component, nunca funciones) — mutuamente excluyente con `marca`.
+  marcaPersonalizada?: MarcaPersonalizada | null;
+  envioPersonalizado: boolean;
+}) {
   const [copiado, setCopiado] = useState(false);
   // Feedback de error de portapapeles — bug real confirmado (2026-08-24,
   // Ronda 2): sin esto, si el navegador rechaza el acceso al portapapeles
@@ -17,7 +28,9 @@ export function CopyPromptButton({ marca, envioPersonalizado }: { marca: Marca |
         type="button"
         onClick={async () => {
           try {
-            await navigator.clipboard.writeText(armarPromptPlantillaNueva(marca, envioPersonalizado));
+            await navigator.clipboard.writeText(
+              armarPromptPlantillaNueva(marca, envioPersonalizado, marcaPersonalizada)
+            );
             setErrorCopia(false);
             setCopiado(true);
             setTimeout(() => setCopiado(false), 2000);

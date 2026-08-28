@@ -11,6 +11,7 @@ import {
   MARCAS,
   type VariableSchema,
   type Marca,
+  type MarcaPersonalizada,
 } from '@/lib/landing-template-defaults';
 import { FormInput, inputClass, labelClass } from '../FormInput';
 
@@ -48,12 +49,16 @@ export function TemplateForm({
   valoresIniciales,
   campanasConectadas = 0,
   envioPersonalizadoPorDefecto = false,
+  marcasPersonalizadas = [],
 }: {
   action: Accion;
   botonTexto: string;
   valoresIniciales?: {
     name: string;
     marca: Marca | null;
+    // Solo uno de los dos viene con valor a la vez — nunca los dos
+    // juntos, ver el comentario en templates/actions.ts → templateSchema.
+    marca_personalizada_id?: string | null;
     html_content: string;
     variables_schema: VariableSchema[] | null;
     is_active: boolean;
@@ -64,6 +69,11 @@ export function TemplateForm({
     // alguien más guardó esta plantilla mientras tanto.
     updated_at?: string;
   };
+  // Marcas creadas desde /admin/marcas (2026-08-28) — se suman como
+  // grupo aparte en el selector de "Marca", además de las 4 fijas de
+  // MARCAS. Vacío en "Nueva plantilla" desde el flujo viejo, siempre se
+  // pasa la lista real desde templates/new/page.tsx.
+  marcasPersonalizadas?: MarcaPersonalizada[];
   // Cuántas campañas dependen de esta plantilla hoy (a través de sus
   // landings) — 0 en "Nueva plantilla", siempre. Con más de 0, el HTML
   // queda de solo lectura: cambiar los {{clave}} de una plantilla en
@@ -83,7 +93,28 @@ export function TemplateForm({
   // normal de "Nueva plantilla".
   const mostrarEnvioPersonalizado = envioPersonalizadoPorDefecto || (valoresIniciales?.envio_personalizado ?? false);
   const [state, formAction] = useFormState(action, undefined);
-  const [marca, setMarca] = useState<Marca | ''>(valoresIniciales?.marca ?? '');
+  // Un solo valor de texto codifica los 3 casos posibles del <select>
+  // de abajo — 'none' (sin marca fija, elección explícita), un slug de
+  // MARCAS (marca fija), o "custom:<uuid>" (marca propia). En "Nueva
+  // plantilla" arranca vacío a propósito: el placeholder disabled del
+  // <select> obliga a elegir algo antes de poder guardar (2026-08-28,
+  // pedido explícito — antes se podía guardar sin marca en silencio).
+  // Editando una plantilla vieja sin marca (de antes de este cambio),
+  // arranca en 'none' — es funcionalmente lo mismo que ya tenía, no la
+  // fuerza a elegir de nuevo.
+  const [marcaSeleccionada, setMarcaSeleccionada] = useState<string>(() => {
+    if (!valoresIniciales) return '';
+    if (valoresIniciales.marca_personalizada_id) return `custom:${valoresIniciales.marca_personalizada_id}`;
+    if (valoresIniciales.marca) return valoresIniciales.marca;
+    return 'none';
+  });
+  const marcaFija: Marca | null =
+    marcaSeleccionada && marcaSeleccionada !== 'none' && !marcaSeleccionada.startsWith('custom:')
+      ? (marcaSeleccionada as Marca)
+      : null;
+  const marcaPersonalizadaSeleccionada = marcaSeleccionada.startsWith('custom:')
+    ? (marcasPersonalizadas.find((m) => m.id === marcaSeleccionada.slice('custom:'.length)) ?? null)
+    : null;
   const [envioPersonalizado, setEnvioPersonalizado] = useState(
     valoresIniciales?.envio_personalizado ?? envioPersonalizadoPorDefecto
   );
@@ -132,20 +163,41 @@ export function TemplateForm({
           <select
             id="marca"
             name="marca"
-            value={marca}
-            onChange={(e) => setMarca(e.target.value as Marca | '')}
+            required
+            value={marcaSeleccionada}
+            onChange={(e) => setMarcaSeleccionada(e.target.value)}
             className={inputClass}
           >
-            <option value="">— Sin marca específica (estilo libre) —</option>
-            {(Object.keys(MARCAS) as Marca[]).map((m) => (
-              <option key={m} value={m}>
-                {MARCAS[m].nombre}
-              </option>
-            ))}
+            {/* disabled a propósito (2026-08-28, pedido explícito) — obliga a
+                elegir algo real antes de poder guardar, en vez de dejar
+                pasar una plantilla sin marca definir en silencio. */}
+            <option value="" disabled>
+              — Elegí una marca —
+            </option>
+            <option value="none">Sin marca fija (estilo 100% libre)</option>
+            <optgroup label="Marcas fijas del sistema">
+              {(Object.keys(MARCAS) as Marca[]).map((m) => (
+                <option key={m} value={m}>
+                  {MARCAS[m].nombre}
+                </option>
+              ))}
+            </optgroup>
+            {marcasPersonalizadas.length > 0 && (
+              <optgroup label="Tus marcas">
+                {marcasPersonalizadas.map((m) => (
+                  <option key={m.id} value={`custom:${m.id}`}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <p className="mt-1 text-xs text-one-oscuro/40">
             Si elegís una marca, el prompt de abajo fija su paleta, tipografía y logos exactos — ya
-            no hay que definir colores a mano cada vez.
+            no hay que definir colores a mano cada vez.{' '}
+            <a href="/admin/marcas/new" target="_blank" rel="noreferrer" className="font-semibold text-one-fucsia hover:underline">
+              ¿Necesitás crear una marca nueva?
+            </a>
           </p>
         </div>
 
@@ -214,7 +266,11 @@ export function TemplateForm({
             <label className={labelClass} htmlFor="html_content">
               HTML de la plantilla
             </label>
-            <CopyPromptButton marca={marca || null} envioPersonalizado={envioPersonalizado} />
+            <CopyPromptButton
+              marca={marcaFija}
+              marcaPersonalizada={marcaPersonalizadaSeleccionada}
+              envioPersonalizado={envioPersonalizado}
+            />
           </div>
           {bloqueada && (
             <p className="mb-2 rounded-one-sm bg-one-dorado/10 px-3 py-2 text-xs text-one-oscuro/70">

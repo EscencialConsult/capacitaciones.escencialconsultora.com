@@ -28,7 +28,9 @@ export default async function TemplatesPage({
 
   const { data: templates } = await supabase
     .from('landing_templates')
-    .select('id, name, marca, is_active, updated_at, envio_personalizado, landings(count)')
+    .select(
+      'id, name, marca, is_active, updated_at, envio_personalizado, landings(count), marcas_personalizadas(nombre, logo_isotipo)'
+    )
     .eq('envio_personalizado', personalizado)
     .order('updated_at', { ascending: false });
 
@@ -78,6 +80,9 @@ export default async function TemplatesPage({
         <tbody>
             {(templates ?? []).map((t) => {
               const usoCount = (t.landings as unknown as { count: number }[])?.[0]?.count ?? 0;
+              const marcaPersonalizada = t.marcas_personalizadas as unknown as
+                | { nombre: string; logo_isotipo: string }
+                | null;
               return (
                 <tr key={t.id} className="table-row-hover border-t border-one-oscuro/5">
                   {/* Bug real confirmado (2026-08-25) — sin truncar, un nombre
@@ -101,6 +106,15 @@ export default async function TemplatesPage({
                         width={40}
                         height={40}
                         className="size-10 shrink-0 rounded-full object-cover ring-1 ring-one-oscuro/10"
+                      />
+                    ) : marcaPersonalizada ? (
+                      <Image
+                        src={marcaPersonalizada.logo_isotipo}
+                        alt={marcaPersonalizada.nombre}
+                        title={marcaPersonalizada.nombre}
+                        width={40}
+                        height={40}
+                        className="size-10 shrink-0 rounded-full bg-one-oscuro/5 object-contain ring-1 ring-one-oscuro/10"
                       />
                     ) : (
                       <span className="text-one-oscuro/30">—</span>

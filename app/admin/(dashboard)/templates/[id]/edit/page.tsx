@@ -2,17 +2,23 @@ import { notFound } from 'next/navigation';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { TemplateForm } from '../../TemplateForm';
 import { updateTemplate, contarCampanasConectadas } from '../../actions';
+import { obtenerMarcasPersonalizadas } from '@/lib/marcas-personalizadas';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EditTemplatePage({ params }: { params: { id: string } }) {
   const supabase = createSupabaseServiceClient();
 
-  const { data: template } = await supabase
-    .from('landing_templates')
-    .select('id, name, marca, html_content, variables_schema, is_active, envio_personalizado, updated_at')
-    .eq('id', params.id)
-    .single();
+  const [{ data: template }, marcasPersonalizadas] = await Promise.all([
+    supabase
+      .from('landing_templates')
+      .select(
+        'id, name, marca, marca_personalizada_id, html_content, variables_schema, is_active, envio_personalizado, updated_at'
+      )
+      .eq('id', params.id)
+      .single(),
+    obtenerMarcasPersonalizadas(),
+  ]);
 
   if (!template) notFound();
 
@@ -28,6 +34,7 @@ export default async function EditTemplatePage({ params }: { params: { id: strin
         botonTexto="Guardar cambios"
         valoresIniciales={template}
         campanasConectadas={campanasConectadas}
+        marcasPersonalizadas={marcasPersonalizadas}
       />
     </div>
   );

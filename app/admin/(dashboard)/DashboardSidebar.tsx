@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug, Palette } from 'lucide-react';
 import { Avatar } from './Avatar';
 
 const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
@@ -13,6 +13,9 @@ const NAV = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
   { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList },
   { href: '/admin/landings', label: 'Landings', icon: Rocket },
+  // Marcas antes de Plantillas (2026-08-28) — es el paso lógico previo:
+  // elegís o creás la marca ANTES de armar una plantilla que la use.
+  { href: '/admin/marcas', label: 'Marcas', icon: Palette },
   { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate },
   { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
   { href: '/admin/users', label: 'Usuarios', icon: Users },

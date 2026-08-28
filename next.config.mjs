@@ -16,6 +16,19 @@ const nextConfig = {
       dynamic: 0,
     },
   },
+  // Logos de marcas personalizadas (2026-08-28) — viven en el bucket
+  // público "marca-logos" de Supabase Storage, no en /public/ como los
+  // de las 4 marcas fijas del sistema. next/image exige declarar de
+  // antemano cualquier dominio externo del que sirva imágenes.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

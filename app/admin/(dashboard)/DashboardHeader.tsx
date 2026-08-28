@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, LogOut, Zap } from 'lucide-react';
-import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Palette } from 'lucide-react';
 import { signOut } from '../login/actions';
 import { Avatar } from './Avatar';
 
@@ -12,6 +12,7 @@ const ITEMS_BUSCABLES = [
   { id: 'inicio', nombre: 'Inicio', ruta: '/admin', icon: LayoutDashboard },
   { id: 'campaigns', nombre: 'Campañas', ruta: '/admin/campaigns', icon: ClipboardList },
   { id: 'landings', nombre: 'Landings', ruta: '/admin/landings', icon: Rocket },
+  { id: 'marcas', nombre: 'Marcas', ruta: '/admin/marcas', icon: Palette },
   { id: 'templates', nombre: 'Plantillas de landing', ruta: '/admin/templates', icon: LayoutTemplate },
   { id: 'email-templates', nombre: 'Plantillas de email', ruta: '/admin/email-templates', icon: Mail },
   { id: 'users', nombre: 'Usuarios', ruta: '/admin/users', icon: Users },

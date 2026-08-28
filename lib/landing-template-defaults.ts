@@ -13,6 +13,27 @@ export type VariableSchema = {
 export type DescripcionVariable = { label?: string; descripcion?: string };
 
 /**
+ * Marca creada por un admin desde /admin/marcas (2026-08-28, pedido
+ * explícito: "debo poner un apartado donde la gente pueda crear su
+ * propias marcas y subir sus logos") — mismo tipo de datos que una
+ * marca fija de MARCAS más abajo, pero cargada desde la tabla
+ * marcas_personalizadas en vez de hardcodeada en este archivo. Las 4
+ * marcas fijas NO se tocan ni se migran a la base — este es un sistema
+ * paralelo, aditivo.
+ */
+export type MarcaPersonalizada = {
+  id: string;
+  nombre: string;
+  colores: string[];
+  degradado: string | null;
+  tipografiaPrincipal: string;
+  tipografiasSecundarias: string[];
+  logoBlanco: string;
+  logoNegro: string;
+  logoIsotipo: string;
+};
+
+/**
  * Marcas con identidad fija (paleta + tipografía + logos ya definidos,
  * no "a elección" en el prompt como el resto). Selección todavía no
  * tiene logos/paleta cargados — se agrega acá el día que lleguen, ver
@@ -658,8 +679,34 @@ Footer — esto es FIJO, no de diseño libre, ver el bloque literal más abajo q
  * navegador de cada visitante, más lento justo en la página que más
  * importa que cargue rápido).
  */
-export function armarPromptPlantillaNueva(marca: Marca | null = null, envioPersonalizado: boolean = false) {
-  const config = marca ? MARCAS[marca] : null;
+export function armarPromptPlantillaNueva(
+  marca: Marca | null = null,
+  envioPersonalizado: boolean = false,
+  // Marca creada desde /admin/marcas (2026-08-28) — mutuamente
+  // excluyente con `marca` (el caller nunca manda los dos a la vez, ver
+  // TemplateForm.tsx). Se arma acá mismo un ConfigMarca equivalente al
+  // de una marca fija para no duplicar nada del resto de la función —
+  // `marca` se queda en null en este caso, así que el bloque "ONE nunca
+  // va sola" y el footer (que dependen de `marca === 'one'`) siguen
+  // comportándose bien solos, sin ningún if extra.
+  marcaPersonalizada: MarcaPersonalizada | null = null
+) {
+  const config: ConfigMarca | null = marcaPersonalizada
+    ? {
+        nombre: marcaPersonalizada.nombre,
+        colores: marcaPersonalizada.colores,
+        degradado: marcaPersonalizada.degradado ?? undefined,
+        tipografiaPrincipal: marcaPersonalizada.tipografiaPrincipal,
+        tipografiasSecundarias: marcaPersonalizada.tipografiasSecundarias,
+        logos: {
+          blanco: marcaPersonalizada.logoBlanco,
+          negro: marcaPersonalizada.logoNegro,
+          isotipo: marcaPersonalizada.logoIsotipo,
+        },
+      }
+    : marca
+      ? MARCAS[marca]
+      : null;
   const htmlBase = envioPersonalizado ? HTML_BASE_ENVIO_PERSONALIZADO : HTML_BASE;
 
   // Sin marca fija: el estilo queda 100% a elección (comportamiento de
