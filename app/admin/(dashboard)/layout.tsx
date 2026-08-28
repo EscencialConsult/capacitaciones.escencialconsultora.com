@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
 
@@ -11,9 +12,28 @@ import { DashboardHeader } from './DashboardHeader';
 // sesión en cada request bajo /admin/*; pedirlo de nuevo acá duplicaba el
 // viaje de red a Supabase en cada navegación (esa fue la causa real de
 // la lentitud entre pantallas, no el diseño).
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const email = headers().get('x-user-email');
   const avatar = headers().get('x-user-avatar') || null;
+  const userId = headers().get('x-user-id') || null;
+
+  // Contador de créditos del header (2026-08-28, pedido explícito: "que
+  // esté a la par del user, arriba a la derecha") — antes solo vivía en
+  // /admin/profile, así que había que navegar ahí para ver si quedaba
+  // crédito. Dos RPCs livianas (ya existían, ver migración 0019), en
+  // paralelo con el resto del layout — no bloquean el render del resto
+  // del panel más de lo que ya tardaba.
+  let creditosTotal = 0;
+  let creditosUsados = 0;
+  if (userId) {
+    const admin = createSupabaseServiceClient();
+    const [{ data: total }, { data: usados }] = await Promise.all([
+      admin.rpc('creditos_mensuales_de', { p_user_id: userId }),
+      admin.rpc('creditos_usados_ciclo_actual', { p_user_id: userId }),
+    ]);
+    creditosTotal = total ?? 0;
+    creditosUsados = usados ?? 0;
+  }
 
   return (
     // .admin-glow (ver globals.css) — dos manchas de color fixed detrás de
@@ -26,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="relative z-10 flex w-full">
         <DashboardSidebar avatar={avatar} email={email} />
         <div className="flex flex-1 flex-col overflow-y-auto">
-          <DashboardHeader email={email} avatar={avatar} />
+          <DashboardHeader email={email} avatar={avatar} creditosTotal={creditosTotal} creditosUsados={creditosUsados} />
           {/* Sin max-w (2026-08-25, pedido explícito) — con el tope
               anterior (max-w-6xl, 1152px) sobraba muchísimo espacio
               vacío a los costados en cualquier pantalla ancha real;

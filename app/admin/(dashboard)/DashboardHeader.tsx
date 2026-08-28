@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, LogOut } from 'lucide-react';
+import { Search, LogOut, Zap } from 'lucide-react';
 import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users } from 'lucide-react';
 import { signOut } from '../login/actions';
 import { Avatar } from './Avatar';
@@ -24,10 +24,56 @@ function normalizar(texto: string) {
     .toLowerCase();
 }
 
+/**
+ * Contador de créditos del header (2026-08-28, pedido explícito: "que
+ * esté a la par del user, arriba a la derecha") — versión chica del
+ * medidor de /admin/profile, siempre visible sin tener que navegar ahí.
+ * Mismo criterio de color con significado que BarraCreditos (ver
+ * profile/page.tsx): fucsia mientras hay margen, dorado cerca del
+ * límite, rojo en o sobre el límite. Si total es 0 (sin ninguna cuenta
+ * Brevo/Resend conectada a este usuario) se muestra igual, atenuado —
+ * mejor que desaparecer sin avisar que ese admin no tiene capacidad de
+ * envío propia.
+ */
+function CreditosBadge({ total, usado }: { total: number; usado: number }) {
+  const sinCuenta = total === 0;
+  const porcentaje = total > 0 ? (usado / total) * 100 : 0;
+  const color = sinCuenta
+    ? 'text-one-oscuro/35'
+    : porcentaje >= 100
+      ? 'text-one-rojo'
+      : porcentaje >= 80
+        ? 'text-one-dorado'
+        : 'text-one-fucsia';
+
+  return (
+    <Link
+      href="/admin/profile"
+      title={sinCuenta ? 'Sin cuenta de envío conectada — ver Mi perfil' : `${usado.toLocaleString('es-AR')} de ${total.toLocaleString('es-AR')} créditos usados este ciclo`}
+      className="hidden items-center gap-1.5 rounded-full bg-one-oscuro/5 px-3 py-1.5 text-xs font-bold transition-colors duration-150 hover:bg-one-oscuro/10 md:flex"
+    >
+      <Zap className={`size-3.5 ${color}`} strokeWidth={2.25} />
+      <span className={color}>
+        {sinCuenta ? 'Sin cuenta' : `${usado.toLocaleString('es-AR')} / ${total.toLocaleString('es-AR')}`}
+      </span>
+    </Link>
+  );
+}
+
 // Header clonado de DashboardHeader.jsx (COMRURAL) — buscador que filtra
 // los mismos ítems del sidebar y navega, más el pill de usuario y logout.
 // Sin clima/notificaciones: esas features no existen en esta plataforma.
-export function DashboardHeader({ email, avatar }: { email: string | null; avatar: string | null }) {
+export function DashboardHeader({
+  email,
+  avatar,
+  creditosTotal,
+  creditosUsados,
+}: {
+  email: string | null;
+  avatar: string | null;
+  creditosTotal: number;
+  creditosUsados: number;
+}) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState('');
   const [enfocado, setEnfocado] = useState(false);
@@ -115,6 +161,8 @@ export function DashboardHeader({ email, avatar }: { email: string | null; avata
           </div>
         )}
       </div>
+
+      <CreditosBadge total={creditosTotal} usado={creditosUsados} />
 
       <Link
         href="/admin/profile"

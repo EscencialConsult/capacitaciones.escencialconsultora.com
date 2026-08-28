@@ -113,6 +113,12 @@ export async function middleware(request: NextRequest) {
   // volver a pedirlo en el layout.
   const avatar = (user.user_metadata as { avatar?: string } | null)?.avatar;
   request.headers.set('x-user-avatar', avatar ?? '');
+  // Mismo criterio para el contador de créditos del header (2026-08-28,
+  // pedido explícito: "arriba a la derecha en el head a la par del
+  // user") — el layout necesita el user_id para llamar
+  // creditos_mensuales_de/creditos_usados_ciclo_actual, y ya lo tenemos
+  // acá gratis.
+  request.headers.set('x-user-id', user.id);
 
   const url = request.nextUrl.clone();
   url.pathname = pathDestino;
