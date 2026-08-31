@@ -121,7 +121,7 @@ export default async function IntegrationsPage({
   // sistema de créditos (ver migración 0019) cobra según de quién es
   // la cuenta que activó cada campaña, así que lo que se ve/conecta
   // acá tiene que ser exactamente lo que ESTE admin va a consumir.
-  const [{ data: brevo }, { data: resend }, { data: googleConfig }, { data: google }] = await Promise.all([
+  const [{ data: brevo }, { data: resend }, { data: googleConfig }, { data: google }, { data: solicitudGoogle }] = await Promise.all([
     supabase
       .from('brevo_accounts')
       .select('api_key_encrypted, api_key_last4, validated_at, daily_limit, plan_tipo, creditos_pago')
@@ -138,6 +138,7 @@ export default async function IntegrationsPage({
       .select('google_email, tipo_cuenta, plan_tipo, creditos_pago')
       .eq('user_id', admin?.id ?? '')
       .maybeSingle(),
+    supabase.from('google_connection_requests').select('estado').eq('user_id', admin?.id ?? '').maybeSingle(),
   ]);
 
   const brevoConectado = !!brevo?.api_key_encrypted;
@@ -239,6 +240,7 @@ export default async function IntegrationsPage({
             tipoCuenta={(google?.tipo_cuenta as 'personal' | 'workspace') ?? null}
             planTipo={(google?.plan_tipo as 'free' | 'pago') ?? 'free'}
             creditosPago={google?.creditos_pago}
+            estadoSolicitud={(solicitudGoogle?.estado as 'pendiente' | 'aprobado' | 'rechazado') ?? null}
           />
         </div>
       </div>

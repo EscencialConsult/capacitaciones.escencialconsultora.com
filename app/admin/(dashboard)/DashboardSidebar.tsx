@@ -9,16 +9,22 @@ import { Avatar } from './Avatar';
 
 const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
 
-type ItemNav = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+type ItemNav = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; paso?: number };
 
+// paso 1-2-3 (2026-08-31, pedido explícito: "poné algo que muestre los
+// pasos para una campaña") — el orden real para publicar algo nuevo:
+// armar la plantilla, crear la landing con esa plantilla, crear la
+// campaña que le da contenido y la activa. Un numerito discreto sobre
+// el ícono, no reemplaza el nombre — sigue siendo "Plantillas de
+// landing", solo con una pista de en qué orden usarlas la primera vez.
 const NAV: ItemNav[] = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
-  { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList },
-  { href: '/admin/landings', label: 'Landings', icon: Rocket },
+  { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList, paso: 3 },
+  { href: '/admin/landings', label: 'Landings', icon: Rocket, paso: 2 },
   // Marcas antes de Plantillas (2026-08-28) — es el paso lógico previo:
   // elegís o creás la marca ANTES de armar una plantilla que la use.
   { href: '/admin/marcas', label: 'Marcas', icon: Palette },
-  { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate },
+  { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate, paso: 1 },
   { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/settings/integrations', label: 'Integraciones', icon: Plug },
@@ -81,20 +87,28 @@ export function DashboardSidebar({
           title={colapsado ? 'Expandir menú' : 'Minimizar menú'}
           className={`mb-8 block ${colapsado ? '' : 'px-1'}`}
         >
+          {/* Mismo logo de ONE en los dos estados (2026-08-31, pedido
+              explícito) — antes expandido mostraba el wordmark de
+              Escencial y colapsado el de ONE, dos marcas distintas
+              según el estado. Ahora los dos son ONE: el isotipo solo
+              (la espiral, sin texto) colapsado, y el logo completo
+              (espiral + "NE") expandido — mismos archivos que ya usa
+              el resto del sistema para esta marca, ver MARCAS en
+              lib/landing-template-defaults.ts. */}
           <div className="relative flex h-16 w-full items-center justify-center rounded-one-sm bg-one-blanco">
             <Image
-              src="/logos/logo-escencial.webp"
-              alt="Escencial"
-              width={140}
-              height={36}
+              src="/logos/one-logocolor.webp"
+              alt="ONE"
+              width={160}
+              height={80}
               aria-hidden={colapsado}
               className={`sidebar-logo-fade absolute h-9 w-auto max-w-[85%] object-contain ${
                 colapsado ? 'opacity-0' : 'opacity-100'
               }`}
             />
             <Image
-              src="/logos/one-logocolor.webp"
-              alt="Escencial"
+              src="/logos/one/logo-isotipo.webp"
+              alt="ONE"
               width={40}
               height={40}
               aria-hidden={!colapsado}
@@ -116,7 +130,14 @@ export function DashboardSidebar({
                 className={linkClass(!!activo)}
                 title={colapsado ? item.label : undefined}
               >
-                <Icon className="size-5 shrink-0" strokeWidth={1.75} />
+                <span className="relative inline-flex shrink-0">
+                  <Icon className="size-5" strokeWidth={1.75} />
+                  {item.paso && (
+                    <span className="absolute -top-1.5 -left-1.5 flex size-3.5 items-center justify-center rounded-full bg-one-fucsia text-[9px] leading-none font-extrabold text-one-negro">
+                      {item.paso}
+                    </span>
+                  )}
+                </span>
                 <span className={`sidebar-label ${colapsado ? 'is-oculto' : ''}`}>{item.label}</span>
               </Link>
             );

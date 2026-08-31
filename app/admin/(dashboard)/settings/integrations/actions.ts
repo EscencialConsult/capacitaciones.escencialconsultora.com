@@ -350,6 +350,55 @@ export async function verificarDominioPropioResend(): Promise<Resultado> {
   return { ok: true };
 }
 
+// ── Pedir acceso a Google (2026-08-31, pedido explícito) ────────────
+// Mientras la app esté en modo "Prueba" en Google Cloud, solo pueden
+// loguearse los emails que un superadmin agregó A MANO como "Test
+// user" ahí — no hay ninguna API para hacerlo por código. Antes, un
+// admin nuevo recién se enteraba de esto al chocar con el error 403 de
+// Google. Ahora: pide acceso acá → el superadmin lo ve en
+// /admin/superadmin, hace el paso manual en Google Cloud, y aprueba →
+// recién ahí aparece el botón real de "Conectar con Google" (ver
+// iniciarConexionGoogle más abajo, que además revalida esto server-side).
+export async function pedirConexionGoogle(): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const supabase = createSupabaseServiceClient();
+
+  const { data: actual } = await supabase
+    .from('google_connection_requests')
+    .select('estado')
+    .eq('user_id', admin.id)
+    .maybeSingle();
+
+  // Ya aprobado o con un pedido pendiente — no hay nada que re-pedir
+  // (la UI no debería ni ofrecer el botón en ese caso, esto es una red
+  // de seguridad server-side).
+  if (actual?.estado === 'aprobado' || actual?.estado === 'pendiente') {
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from('google_connection_requests').upsert(
+    {
+      user_id: admin.id,
+      estado: 'pendiente',
+      solicitado_en: new Date().toISOString(),
+      aprobado_por: null,
+      aprobado_en: null,
+    },
+    { onConflict: 'user_id' }
+  );
+
+  if (error) {
+    console.error('Error pidiendo acceso a Google:', error);
+    return { error: 'No se pudo enviar el pedido. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  revalidatePath('/admin/superadmin');
+  return { ok: true };
+}
+
 // ── Conectar Google (2026-08-31) — OAuth, nunca una API key pegada ──
 // A diferencia de Brevo/Resend, acá no hay ningún formulario: el admin
 // tira un click y Google se encarga del resto. Ver lib/google-oauth.ts
@@ -359,6 +408,21 @@ export async function verificarDominioPropioResend(): Promise<Resultado> {
 export async function iniciarConexionGoogle() {
   const admin = await requireAdmin();
   if (!admin) redirect('/admin/login');
+
+  const supabase = createSupabaseServiceClient();
+  const { data: solicitud } = await supabase
+    .from('google_connection_requests')
+    .select('estado')
+    .eq('user_id', admin.id)
+    .maybeSingle();
+
+  // Red de seguridad server-side — la UI ya no ofrece este botón sin
+  // aprobación, pero si de todas formas se llega acá sin ella, Google
+  // igual va a rechazar el login con un 403 confuso; mejor frenarlo acá
+  // con un mensaje claro.
+  if (solicitud?.estado !== 'aprobado') {
+    redirect('/admin/settings/integrations?google_error=' + encodeURIComponent('Todavía no tenés acceso aprobado — pedilo primero.'));
+  }
 
   const config = await obtenerConfigGoogle();
   if (!config) {

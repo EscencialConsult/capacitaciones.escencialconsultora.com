@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
-import { ChevronDown, ShieldCheck } from 'lucide-react';
+import { ChevronDown, ShieldCheck, UserCheck } from 'lucide-react';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { esSuperAdmin } from '@/lib/superadmin';
 import { ConfigGoogleForm } from './ConfigGoogleForm';
+import { SolicitudesGoogle } from './SolicitudesGoogle';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,31 @@ export default async function SuperadminPage() {
   }
 
   const supabase = createSupabaseServiceClient();
-  const { data: config } = await supabase
-    .from('google_oauth_config')
-    .select('client_id, configurado_en')
-    .eq('id', 1)
-    .maybeSingle();
+  const [{ data: config }, { data: pedidos }, { data: listaUsuarios }] = await Promise.all([
+    supabase.from('google_oauth_config').select('client_id, configurado_en').eq('id', 1).maybeSingle(),
+    supabase
+      .from('google_connection_requests')
+      .select('user_id, solicitado_en')
+      .eq('estado', 'pendiente')
+      .order('solicitado_en', { ascending: true }),
+    supabase.auth.admin.listUsers(),
+  ]);
+
+  // Los pedidos solo guardan user_id — el email/nombre vive en
+  // auth.users, no alcanzable con un join normal de PostgREST (ver
+  // mismo criterio en users/page.tsx). Se arma el cruce acá.
+  const usuariosPorId = new Map(
+    (listaUsuarios?.users ?? []).map((u) => [
+      u.id,
+      { email: u.email ?? '', nombre: [u.user_metadata?.nombre, u.user_metadata?.apellido].filter(Boolean).join(' ') },
+    ])
+  );
+  const solicitudes = (pedidos ?? []).map((p) => ({
+    userId: p.user_id,
+    email: usuariosPorId.get(p.user_id)?.email ?? '(usuario no encontrado)',
+    nombre: usuariosPorId.get(p.user_id)?.nombre ?? null,
+    solicitadoEn: p.solicitado_en,
+  }));
 
   return (
     <div className="max-w-3xl">
@@ -47,6 +68,18 @@ export default async function SuperadminPage() {
       <p className="mt-1 text-sm text-one-oscuro/60">
         Configuración de toda la plataforma — no aparece para el resto de los admins.
       </p>
+
+      <div className="mt-6 rounded-one-lg border border-one-oscuro/10 bg-one-blanco p-6 shadow-one-sm">
+        <h2 className="flex items-center gap-2 text-lg font-extrabold text-one-oscuro">
+          <UserCheck className="size-5 text-one-fucsia" strokeWidth={1.75} />
+          Pedidos de conexión de Google
+        </h2>
+        <p className="mt-1 text-sm text-one-oscuro/70">
+          Mientras Google no verifique la app, solo pueden conectar los emails que agregues a mano
+          como &quot;Test user&quot; — por cada pedido: 1) agregá el email ahí, 2) volvé y aprobalo acá.
+        </p>
+        <SolicitudesGoogle solicitudes={solicitudes} />
+      </div>
 
       <div className="mt-6 rounded-one-lg border border-one-oscuro/10 bg-one-blanco p-6 shadow-one-sm">
         <h2 className="text-lg font-extrabold text-one-oscuro">Google OAuth</h2>

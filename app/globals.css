@@ -55,6 +55,11 @@
   opacity: 1;
   overflow: hidden;
   white-space: nowrap;
+  /* Bug real reportado (2026-08-31, "se corta con la interfaz") — sin
+     esto, una etiqueta más larga que max-width (ej. "Plantillas de
+     landing") se cortaba en seco a mitad de letra, sin ningún aviso
+     visual de que sigue habiendo texto — se ve roto, no "con estilo". */
+  text-overflow: ellipsis;
   transition:
     max-width 250ms cubic-bezier(0.16, 1, 0.3, 1),
     margin-left 250ms cubic-bezier(0.16, 1, 0.3, 1),

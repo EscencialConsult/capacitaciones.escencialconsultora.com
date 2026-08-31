@@ -65,3 +65,54 @@ export async function borrarConfigGoogle(): Promise<Resultado> {
   revalidatePath('/admin/settings/integrations');
   return { ok: true };
 }
+
+/**
+ * Aprobar/rechazar pedidos de conexión de Google (2026-08-31, pedido
+ * explícito) — el paso real (agregar el email como Test user en Google
+ * Cloud Console) NO se automatiza acá, no hay API de Google para eso —
+ * esto solo registra la decisión DESPUÉS de que el superadmin ya hizo
+ * ese paso a mano (ver el link directo a Test users en la UI, page.tsx).
+ */
+export async function aprobarConexionGoogle(userId: string): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin || !esSuperAdmin(admin.email)) {
+    return { error: 'No autorizado.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('google_connection_requests')
+    .update({ estado: 'aprobado', aprobado_por: admin.id, aprobado_en: new Date().toISOString() })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error aprobando conexión de Google:', error);
+    return { error: 'No se pudo aprobar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/superadmin');
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+export async function rechazarConexionGoogle(userId: string): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin || !esSuperAdmin(admin.email)) {
+    return { error: 'No autorizado.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('google_connection_requests')
+    .update({ estado: 'rechazado', aprobado_por: admin.id, aprobado_en: new Date().toISOString() })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error rechazando conexión de Google:', error);
+    return { error: 'No se pudo rechazar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/superadmin');
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
