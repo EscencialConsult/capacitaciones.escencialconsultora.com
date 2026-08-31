@@ -22,13 +22,29 @@ import { labelClass } from './FormInput';
  * nada. Fix: un <span id> + role="group" aria-labelledby en el
  * contenedor, patrón correcto para un widget custom sin un único campo.
  */
-export function AvatarPicker({ name, defaultValue }: { name: string; defaultValue?: string }) {
+export function AvatarPicker({
+  name,
+  defaultValue,
+  claseTitulo = labelClass,
+  claseAyuda = 'text-one-oscuro/40',
+  claseAnilloInactivo = 'ring-one-oscuro/10',
+}: {
+  name: string;
+  defaultValue?: string;
+  /** Overrides para usar este picker sobre fondo oscuro (ver
+   * FormRegistro en app/admin/login/LoginScreen.tsx) — los defaults
+   * vienen pensados para el panel admin, con fondo claro; ahí un
+   * anillo oscuro sobre fondo oscuro es invisible. */
+  claseTitulo?: string;
+  claseAyuda?: string;
+  claseAnilloInactivo?: string;
+}) {
   const [seleccionado, setSeleccionado] = useState(defaultValue ?? '');
   const labelId = useId();
 
   return (
     <div>
-      <span id={labelId} className={labelClass}>
+      <span id={labelId} className={claseTitulo}>
         Ícono de perfil
       </span>
       <input type="hidden" name={name} value={seleccionado} />
@@ -55,7 +71,7 @@ export function AvatarPicker({ name, defaultValue }: { name: string; defaultValu
                 width={64}
                 height={64}
                 className={`size-16 rounded-full object-cover ring-2 transition-[box-shadow] duration-150 ${
-                  activo ? 'ring-one-fucsia ring-offset-2' : 'ring-one-oscuro/10 hover:ring-one-fucsia/50'
+                  activo ? 'ring-one-fucsia ring-offset-2' : `${claseAnilloInactivo} hover:ring-one-fucsia/50`
                 }`}
               />
               {activo && (
@@ -67,7 +83,7 @@ export function AvatarPicker({ name, defaultValue }: { name: string; defaultValu
           );
         })}
       </div>
-      <p className="mt-1 text-xs text-one-oscuro/40">
+      <p className={`mt-1 text-xs ${claseAyuda}`}>
         Deslizá para ver más opciones. Opcional — sin elegir ninguno, se muestra la inicial del email.
       </p>
     </div>

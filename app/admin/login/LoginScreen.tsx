@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { signIn, registrarAdmin } from './actions';
 import { AuthInput } from './AuthInput';
+import { AvatarPicker } from '../(dashboard)/AvatarPicker';
 
 /**
  * Logo grande, recortado con CSS (2026-08-31, pedido explícito: "el
@@ -101,6 +103,18 @@ function FormRegistro() {
       </div>
       <AuthInput icon={Mail} id="reg_email" name="email" label="Email" type="email" required autoComplete="username" placeholder="tu@email.com" />
       <AuthInput icon={Lock} id="reg_password" name="password" label="Contraseña" type="password" required minLength={6} autoComplete="new-password" placeholder="Mínimo 6 caracteres" />
+      {/* Mismo picker que "Mi perfil"/alta de usuario, con overrides para
+          fondo oscuro (2026-08-31, pedido explícito: "que se visualice
+          de forma estética el ícono de perfil que puede elegir" en el
+          registro) — claseTitulo clona la convención de AuthInput
+          (text-one-blanco/80) y el anillo inactivo pasa de oscuro-sobre-
+          oscuro (invisible acá) a blanco tenue. */}
+      <AvatarPicker
+        name="avatar"
+        claseTitulo="text-sm font-semibold text-one-blanco/80"
+        claseAyuda="text-one-blanco/40"
+        claseAnilloInactivo="ring-one-blanco/20"
+      />
       <BotonSubmit texto="Crear cuenta" textoPendiente="Creando..." />
     </form>
   );
@@ -119,6 +133,21 @@ export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boo
       <div className="relative grid min-h-svh md:h-svh md:grid-cols-[3fr_2fr]">
         {/* Panel izquierdo — marca + propuesta, nítido. */}
         <div className="login-panel-bg rise-in relative flex h-56 flex-col justify-between overflow-hidden p-6 md:h-full md:p-12">
+          {/* Isotipo de ONE gigante y tenue (2026-08-31, rediseño — sin
+              esto el espacio entre el logo y el texto de abajo quedaba
+              vacío en pantallas grandes de verdad). No es relleno
+              genérico: es la marca de la plataforma, a propósito
+              enorme y de fondo — mismo criterio que "elemento
+              insignia" del sistema de diseño de landings. */}
+          <Image
+            src="/logos/one/logo-isotipo.webp"
+            alt=""
+            width={900}
+            height={900}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 right-[-12%] size-[65vmin] max-w-none -translate-y-1/2 opacity-[0.14] mix-blend-screen md:size-[52vw]"
+          />
+
           <div className="relative">
             <LogoEscencial heightPx={64} />
           </div>

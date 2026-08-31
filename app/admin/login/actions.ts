@@ -35,6 +35,11 @@ export async function registrarAdmin(_prevState: { error?: string } | undefined,
   const password = String(formData.get('password') ?? '');
   const nombre = String(formData.get('nombre') ?? '').trim();
   const apellido = String(formData.get('apellido') ?? '').trim();
+  // Opcional — mismo picker que "Mi perfil"/alta de usuario (ver
+  // AvatarPicker.tsx), acá sumado al registro (2026-08-31, pedido
+  // explícito: que se vea el selector de ícono también acá). Sin elegir
+  // ninguno, el resto del sistema ya sabe mostrar la inicial del email.
+  const avatar = String(formData.get('avatar') ?? '').trim();
 
   if (!email || !password) return { error: 'Completá email y contraseña.' };
   if (password.length < 6) return { error: 'La contraseña tiene que tener al menos 6 caracteres.' };
@@ -46,7 +51,7 @@ export async function registrarAdmin(_prevState: { error?: string } | undefined,
     email,
     password,
     email_confirm: true,
-    user_metadata: { nombre, apellido, celular: null, avatar: null },
+    user_metadata: { nombre, apellido, celular: null, avatar: avatar || null },
   });
 
   if (errorCreando) {
