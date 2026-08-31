@@ -1,15 +1,13 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { randomBytes } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { encryptSecret, decryptSecret, ultimos4 } from '@/lib/crypto';
 import { formatoValido, validarApiKey } from '@/lib/integrations/validate';
 import { crearDominioResend, verificarDominioResend } from '@/lib/dominio-resend';
-import { obtenerConfigGoogle, urlAutorizacionGoogle } from '@/lib/google-oauth';
+import { obtenerConfigGoogle, urlAutorizacionGoogle, armarState } from '@/lib/google-oauth';
 
 type Resultado = { error?: string; ok?: true };
 
@@ -370,21 +368,12 @@ export async function iniciarConexionGoogle() {
     redirect('/admin/settings/integrations');
   }
 
-  // CSRF: un valor random que viaja en la URL de Google y se vuelve a
-  // comparar contra esta misma cookie cuando Google redirige de vuelta
-  // (ver el route handler del callback) — sin esto, cualquiera podría
-  // mandarle a un admin logueado un link de callback con un `code`
-  // ajeno y conectar SU cuenta de Google a la de otra persona.
-  const state = randomBytes(16).toString('hex');
-  cookies().set('google_oauth_state', state, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 300,
-    path: '/',
-  });
-
-  redirect(urlAutorizacionGoogle(config.clientId, state));
+  // state autocontenido (ver lib/google-oauth.ts → armarState) — NO usa
+  // cookie: bug real confirmado en producción, el navegador no manda
+  // ninguna cookie en la vuelta desde accounts.google.com aunque la
+  // sesión siga activa. El state cifrado lleva el user_id adentro, así
+  // el callback sabe a quién corresponde sin depender de ninguna cookie.
+  redirect(urlAutorizacionGoogle(config.clientId, armarState(admin.id)));
 }
 
 export async function desconectarGoogle(): Promise<Resultado> {

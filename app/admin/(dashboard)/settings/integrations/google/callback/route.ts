@@ -1,34 +1,31 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
-import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { encryptSecret } from '@/lib/crypto';
-import { obtenerConfigGoogle, intercambiarCodigoPorTokens, decodificarIdToken } from '@/lib/google-oauth';
+import { obtenerConfigGoogle, intercambiarCodigoPorTokens, decodificarIdToken, leerState } from '@/lib/google-oauth';
 
 /**
  * Vuelta del consentimiento de Google (2026-08-31) — el redirect_uri
  * exacto que se registró en Google Cloud Console apunta acá, no puede
  * moverse de este path sin actualizarlo también ahí (ver
  * lib/google-oauth.ts → REDIRECT_URI, y las instrucciones en
- * /admin/superadmin). No hay pantalla propia: siempre termina en un
- * redirect a Integraciones, con un query param indicando qué pasó.
+ * /admin/superadmin).
+ *
+ * NO depende de sesión/cookies para saber a quién corresponde esta
+ * conexión — bug real confirmado en producción (2026-08-31): en esta
+ * vuelta desde accounts.google.com, el navegador no manda NINGUNA
+ * cookie, ni siquiera con una sesión activa (comportamiento real del
+ * navegador en ese salto, no una sesión vencida). En cambio, `state`
+ * mismo lleva el user_id cifrado (ver lib/google-oauth.ts → armarState/
+ * leerState) — el callback lo desencripta y con eso alcanza, sin
+ * requireAdmin() ni nada que dependa de cookies en esta request puntual.
  */
 export async function GET(request: NextRequest) {
-  const admin = await requireAdmin();
   const destino = new URL('/admin/settings/integrations', request.url);
-
-  if (!admin) {
-    // La sesión se venció justo en medio del ida-y-vuelta con Google —
-    // caso raro pero posible si el consentimiento tardó mucho.
-    return NextResponse.redirect(new URL('/admin/login', request.url));
-  }
 
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const errorGoogle = url.searchParams.get('error');
-
-  const stateGuardado = cookies().get('google_oauth_state')?.value;
-  cookies().delete('google_oauth_state');
 
   if (errorGoogle) {
     // El admin canceló el consentimiento, o algo similar — no es un
@@ -37,7 +34,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(destino);
   }
 
-  if (!code || !state || state !== stateGuardado) {
+  const stateLeido = state ? leerState(state) : null;
+
+  if (!code || !stateLeido) {
     destino.searchParams.set('google_error', 'El intento de conexión no se pudo validar — probá de nuevo desde Integraciones.');
     return NextResponse.redirect(destino);
   }
@@ -67,7 +66,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServiceClient();
     const { error } = await supabase.from('google_accounts').upsert(
       {
-        user_id: admin.id,
+        user_id: stateLeido.userId,
         google_email: email,
         refresh_token_encrypted: encryptSecret(tokens.refresh_token),
         tipo_cuenta: hd ? 'workspace' : 'personal',

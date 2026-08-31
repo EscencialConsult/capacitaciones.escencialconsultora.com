@@ -12,7 +12,7 @@
 // para los límites reales de cada uno).
 
 import { createSupabaseServiceClient } from './supabase/server';
-import { decryptSecret } from './crypto';
+import { decryptSecret, encryptSecret } from './crypto';
 
 const REDIRECT_URI = 'https://capacitaciones.escencialconsultora.com/admin/settings/integrations/google/callback';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'openid', 'email', 'profile'];
@@ -25,15 +25,38 @@ export async function obtenerConfigGoogle(): Promise<{ clientId: string; clientS
 }
 
 /**
- * URL de consentimiento de Google. `state` viaja de ida y vuelta sin
- * tocar — se usa para CSRF (un valor random que se compara al volver,
- * ver el callback) Y para saber a qué admin corresponde este intento
- * (el user_id, ya que Google no manda de vuelta nada nuestro más que
- * esto). access_type=offline + prompt=consent: sin esto, Google NO
- * devuelve refresh_token en re-conexiones (solo la primera vez que un
- * usuario autoriza esta app) — con prompt=consent lo fuerza siempre,
- * necesario porque sin refresh_token no se puede volver a mandar nada
- * pasada una hora (así de corto dura el access_token solo).
+ * `state` autocontenido (2026-08-31, reemplaza un intento anterior con
+ * cookie de un solo uso) — bug real confirmado en producción: en la
+ * vuelta desde accounts.google.com, el navegador no mandó NINGUNA
+ * cookie (ni la de sesión de Supabase ni la de state), aunque el admin
+ * seguía logueado — comportamiento real de cookies entre sitios en ese
+ * salto, no algo que dependa de la sesión. En vez de pelear contra eso,
+ * el `state` ahora ES el dato: `user_id` + un nonce, cifrados con el
+ * mismo AES-256-GCM que ya protege las API keys (lib/crypto.ts) — el
+ * callback lo desencripta para saber a qué admin corresponde la
+ * conexión, sin necesitar NINGUNA cookie de por medio. El cifrado en sí
+ * ya cumple el rol de protección CSRF (nadie puede forjar un state
+ * válido para un user_id ajeno sin la clave del servidor).
+ */
+export function armarState(userId: string): string {
+  return encryptSecret(JSON.stringify({ userId, nonce: Math.random().toString(36).slice(2) }));
+}
+
+export function leerState(state: string): { userId: string } | null {
+  try {
+    const { userId } = JSON.parse(decryptSecret(state));
+    return typeof userId === 'string' && userId ? { userId } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * URL de consentimiento de Google. access_type=offline + prompt=consent:
+ * sin esto, Google NO devuelve refresh_token en re-conexiones (solo la
+ * primera vez que un usuario autoriza esta app) — con prompt=consent lo
+ * fuerza siempre, necesario porque sin refresh_token no se puede volver
+ * a mandar nada pasada una hora (así de corto dura el access_token solo).
  */
 export function urlAutorizacionGoogle(clientId: string, state: string): string {
   const params = new URLSearchParams({

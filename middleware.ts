@@ -47,8 +47,24 @@ function slugDesdeHost(host: string | null): string | null {
   return label;
 }
 
+// Callback de Google OAuth (2026-08-31) — vive bajo /admin/... por
+// consistencia de URL (así se registró en Google Cloud Console), pero
+// tiene que quedar EXENTO del resto de la lógica de esta función: bug
+// real confirmado en producción, el navegador no manda ninguna cookie
+// de sesión en la vuelta desde accounts.google.com (ni con sesión
+// activa) — así que el gateo normal por sesión lo bloqueaba siempre con
+// un 404 antes de llegar siquiera al route handler. La ruta en sí ya no
+// depende de sesión: se autentica sola vía el `state` cifrado (ver
+// lib/google-oauth.ts → armarState/leerState), mismo nivel de
+// seguridad, sin depender de cookies en este tramo puntual.
+const CALLBACK_GOOGLE = '/admin/settings/integrations/google/callback';
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname === CALLBACK_GOOGLE) {
+    return NextResponse.next();
+  }
 
   if (pathname === '/') {
     const slug = slugDesdeHost(request.headers.get('host'));
@@ -99,37 +115,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user }, error: errorUser } = await supabase.auth.getUser();
-
-  // DIAGNÓSTICO TEMPORAL (2026-08-31) — 404 real y reproducible en el
-  // callback de Google OAuth, con sesión supuestamente activa. Borrar
-  // este bloque en cuanto se encuentre la causa.
-  if (pathDestino === '/admin/settings/integrations/google/callback') {
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/system_alerts?on_conflict=source`, {
-        method: 'POST',
-        headers: {
-          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify({
-          source: 'diagnostico_google_callback',
-          message: JSON.stringify({
-            userEncontrado: !!user,
-            errorUser: errorUser?.message ?? null,
-            cookiesNombres: request.cookies.getAll().map((c) => c.name),
-            vinoPorElSecreto,
-          }),
-          last_seen_at: new Date().toISOString(),
-          resolved_at: null,
-        }),
-      });
-    } catch {
-      // Nunca bloquear el flujo real por el diagnóstico en sí.
-    }
-  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (esRaiz) {
     const response = user
