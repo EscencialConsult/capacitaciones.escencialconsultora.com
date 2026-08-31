@@ -2,7 +2,7 @@
 // vaya el nombre de la landing antes del dominio" — nombre-de-landing.
 // escencialconsultora.com en vez de solo capacitaciones.escencialconsultora
 // .com/nombre-de-landing). Dos APIs orquestadas:
-//   - Hostinger (DNS del dominio real, ver skill mcp-hostinguer): crea/
+//   - Hostinger (DNS del dominio real, ver lib/hostinger.ts): crea/
 //     borra el registro CNAME específico de cada landing.
 //   - Netlify (el sitio en sí): agrega/saca ese subdominio como "domain
 //     alias" — necesario para que Netlify emita el certificado SSL y
@@ -22,13 +22,7 @@
 // — nunca bloquea crear/guardar una landing, solo agrega o no el
 // subdominio propio.
 
-const DOMINIO_BASE = 'escencialconsultora.com';
-
-function hostingerToken(): string {
-  const t = process.env.HOSTINGER_API_TOKEN;
-  if (!t) throw new Error('Falta la variable de entorno HOSTINGER_API_TOKEN.');
-  return t;
-}
+import { leerZona, escribirRegistros, borrarRegistro, DOMINIO_BASE } from './hostinger';
 
 function netlifyToken(): string {
   const t = process.env.NETLIFY_API_TOKEN;
@@ -52,23 +46,6 @@ function netlifyDestino(): string {
   return d.endsWith('.') ? d : `${d}.`;
 }
 
-async function hostingerFetch(path: string, init?: RequestInit): Promise<Response> {
-  const resp = await fetch(`https://developers.hostinger.com/api${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${hostingerToken()}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!resp.ok) {
-    const texto = await resp.text().catch(() => '');
-    throw new Error(`Hostinger API respondió ${resp.status}: ${texto.slice(0, 300)}`);
-  }
-  return resp;
-}
-
 async function netlifyFetch(path: string, init?: RequestInit): Promise<Response> {
   const resp = await fetch(`https://api.netlify.com/api/v1${path}`, {
     ...init,
@@ -85,13 +62,6 @@ async function netlifyFetch(path: string, init?: RequestInit): Promise<Response>
   return resp;
 }
 
-type RegistroDNS = { name: string; type: string; records: { content: string }[] };
-
-async function leerZona(): Promise<RegistroDNS[]> {
-  const resp = await hostingerFetch(`/dns/v1/zones/${DOMINIO_BASE}`);
-  return resp.json();
-}
-
 /**
  * true si `slug` ya está ocupado por OTRA cosa en la zona DNS real —
  * management/packonetalent/alumnos/etc, cualquiera de los ~160 registros
@@ -106,23 +76,6 @@ export async function subdominioOcupadoPorOtraCosa(slug: string): Promise<boolea
   if (!fila) return false;
   const yaEsNuestro = fila.type === 'CNAME' && fila.records.some((r) => r.content === destino);
   return !yaEsNuestro;
-}
-
-async function crearOActualizarCNAME(slug: string): Promise<void> {
-  await hostingerFetch(`/dns/v1/zones/${DOMINIO_BASE}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      overwrite: false,
-      zone: [{ name: slug, type: 'CNAME', ttl: 14400, records: [{ content: netlifyDestino() }] }],
-    }),
-  });
-}
-
-async function borrarCNAME(slug: string): Promise<void> {
-  await hostingerFetch(`/dns/v1/zones/${DOMINIO_BASE}`, {
-    method: 'DELETE',
-    body: JSON.stringify({ filters: [{ name: slug, type: 'CNAME' }] }),
-  });
 }
 
 async function agregarAliasNetlify(dominioCompleto: string): Promise<void> {
@@ -166,7 +119,7 @@ export async function publicarSubdominioDeLanding(slug: string): Promise<{ ok: t
         error: `${dominioCompleto} ya está en uso para otra cosa — elegí otro nombre de link si querés su propio subdominio (el link clásico funciona igual).`,
       };
     }
-    await crearOActualizarCNAME(slug);
+    await escribirRegistros([{ name: slug, type: 'CNAME', ttl: 14400, content: netlifyDestino() }]);
     await agregarAliasNetlify(dominioCompleto);
     return { ok: true };
   } catch (e) {
@@ -188,7 +141,7 @@ export async function publicarSubdominioDeLanding(slug: string): Promise<{ ok: t
 export async function despublicarSubdominioDeLanding(slug: string): Promise<void> {
   const dominioCompleto = `${slug}.${DOMINIO_BASE}`;
   try {
-    await borrarCNAME(slug);
+    await borrarRegistro(slug, 'CNAME');
     await quitarAliasNetlify(dominioCompleto);
   } catch (e) {
     console.error('Error despublicando subdominio de landing (no bloquea la acción principal):', e);

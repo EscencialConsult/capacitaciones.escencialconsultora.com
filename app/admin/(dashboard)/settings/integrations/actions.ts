@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
-import { encryptSecret, ultimos4 } from '@/lib/crypto';
+import { encryptSecret, decryptSecret, ultimos4 } from '@/lib/crypto';
 import { formatoValido, validarApiKey } from '@/lib/integrations/validate';
+import { crearDominioResend, verificarDominioResend } from '@/lib/dominio-resend';
 
 type Resultado = { error?: string; ok?: true };
 
@@ -181,21 +182,17 @@ export async function conectarResend(_prevState: Resultado | undefined, formData
       return { error: 'La clave es válida pero no se pudo guardar. Probá de nuevo.' };
     }
   } else {
-    // Primera vez que ESTE admin conecta Resend — a diferencia de Brevo,
-    // Resend exige un dominio propio verificado (no acepta un @gmail.com
-    // como remitente), así que el email de remitente es igual de
-    // obligatorio acá.
-    if (!parsed.data.sender_email) {
-      return {
-        error:
-          'Todavía no conectaste ninguna cuenta de Resend — además de la clave, completá el email de remitente (tiene que ser de un dominio que verificaste en Resend, no un @gmail.com).',
-      };
-    }
-
+    // Primera vez que ESTE admin conecta Resend — a diferencia de antes
+    // (2026-08-24 a 2026-08-31), YA NO hace falta pedir el email de
+    // remitente acá: el dominio propio se crea y verifica solo, desde
+    // este mismo panel, después de conectar la clave (ver
+    // ResendDominioPropio.tsx y crearDominioPropioResend más abajo). Si
+    // igual pegaron un sender_email a mano (alguien que ya tiene un
+    // dominio verificado de antes en Resend), se respeta tal cual.
     const { error } = await supabase.from('resend_accounts').insert({
       user_id: admin.id,
-      sender_email: parsed.data.sender_email,
-      sender_name: parsed.data.sender_name || parsed.data.sender_email,
+      sender_email: parsed.data.sender_email || null,
+      sender_name: parsed.data.sender_name || parsed.data.sender_email || null,
       api_key_encrypted: apiKeyEncriptada,
       api_key_last4: last4,
       validated_at: new Date().toISOString(),
@@ -229,6 +226,122 @@ export async function desconectarResend(): Promise<Resultado> {
   if (error) {
     console.error('Error desconectando Resend:', error);
     return { error: 'No se pudo desconectar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+// ── Dominio propio de Resend, verificado solo (2026-08-31) ──────────
+// Reemplaza el paso manual de "andá a Hostinger y cargá estos DNS a
+// mano" — ver lib/dominio-resend.ts para la orquestación real (Resend
+// + Hostinger). Dos pasos separados porque la verificación de Resend es
+// asíncrona (puede tardar unos minutos en confirmar el DNS): primero se
+// crea el dominio y se cargan los registros, después se puede reintentar
+// "Verificar ahora" las veces que haga falta hasta que Resend confirme.
+
+const nombreSubdominioSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(2, 'Elegí un nombre de al menos 2 caracteres.')
+  .max(40, 'Máximo 40 caracteres.')
+  .regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones — sin espacios ni puntos.');
+
+export async function crearDominioPropioResend(formData: FormData): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const parsedNombre = nombreSubdominioSchema.safeParse(formData.get('subdominio'));
+  if (!parsedNombre.success) return { error: parsedNombre.error.issues[0]?.message ?? 'Nombre inválido.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { data: cuenta } = await supabase
+    .from('resend_accounts')
+    .select('id, api_key_encrypted')
+    .eq('user_id', admin.id)
+    .maybeSingle();
+
+  if (!cuenta?.api_key_encrypted) {
+    return { error: 'Conectá tu API key de Resend primero, arriba.' };
+  }
+
+  const apiKey = decryptSecret(cuenta.api_key_encrypted);
+  const resultado = await crearDominioResend(apiKey, parsedNombre.data);
+
+  if (!resultado.ok) {
+    await supabase.from('resend_accounts').update({ dominio_estado: 'error', dominio_error: resultado.error }).eq('id', cuenta.id);
+    return { error: resultado.error };
+  }
+
+  const { error } = await supabase
+    .from('resend_accounts')
+    .update({
+      dominio_resend_id: resultado.dominioId,
+      dominio_nombre: resultado.dominioNombre,
+      dominio_estado: 'pendiente',
+      dominio_error: null,
+    })
+    .eq('id', cuenta.id);
+
+  if (error) {
+    console.error('Error guardando el dominio de Resend creado:', error);
+    return { error: 'El dominio se creó en Resend, pero no se pudo guardar acá. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+export async function verificarDominioPropioResend(): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { data: cuenta } = await supabase
+    .from('resend_accounts')
+    .select('id, api_key_encrypted, dominio_resend_id, dominio_nombre')
+    .eq('user_id', admin.id)
+    .maybeSingle();
+
+  if (!cuenta?.api_key_encrypted || !cuenta.dominio_resend_id) {
+    return { error: 'Todavía no creaste ningún dominio para verificar.' };
+  }
+
+  const apiKey = decryptSecret(cuenta.api_key_encrypted);
+  const resultado = await verificarDominioResend(apiKey, cuenta.dominio_resend_id);
+
+  if (!resultado.ok) {
+    await supabase.from('resend_accounts').update({ dominio_estado: 'error', dominio_error: resultado.error }).eq('id', cuenta.id);
+    return { error: resultado.error };
+  }
+
+  if (resultado.status === 'verified') {
+    // Verificado — se completa el remitente solo, sin que el admin
+    // tenga que volver a escribir nada. noreply@ como local-part fijo:
+    // es un dominio de envío técnico, no una casilla que alguien lea.
+    const { error } = await supabase
+      .from('resend_accounts')
+      .update({
+        dominio_estado: 'verificado',
+        dominio_error: null,
+        sender_email: `noreply@${cuenta.dominio_nombre}`,
+        sender_name: admin.user_metadata?.nombre ? `${admin.user_metadata.nombre} — Escencial` : 'Escencial Consultora',
+      })
+      .eq('id', cuenta.id);
+
+    if (error) {
+      console.error('Error guardando la verificación del dominio de Resend:', error);
+      return { error: 'Se verificó en Resend, pero no se pudo guardar acá. Probá de nuevo.' };
+    }
+  } else {
+    await supabase
+      .from('resend_accounts')
+      .update({
+        dominio_estado: 'pendiente',
+        dominio_error: `Estado actual en Resend: "${resultado.status}" — el DNS puede tardar unos minutos en propagar. Volvé a intentar en un rato.`,
+      })
+      .eq('id', cuenta.id);
   }
 
   revalidatePath('/admin/settings/integrations');

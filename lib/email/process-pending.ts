@@ -130,7 +130,12 @@ async function resolverCuentaDeEnvio(
     .not('api_key_encrypted', 'is', null)
     .maybeSingle();
 
-  if (resend?.api_key_encrypted) {
+  // sender_email puede quedar null un rato (2026-08-31, ver
+  // lib/dominio-resend.ts) — se completa solo recién cuando Resend
+  // confirma el dominio propio verificado. Sin esta condición, una
+  // cuenta con la clave conectada pero el dominio todavía "pendiente"
+  // se elegía igual acá y el envío fallaba con remitente null.
+  if (resend?.api_key_encrypted && resend.sender_email) {
     try {
       const apiKey = decryptSecret(resend.api_key_encrypted);
       const cuenta: CuentaEnvio = {

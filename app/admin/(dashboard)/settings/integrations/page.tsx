@@ -1,6 +1,7 @@
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { FormInput } from '../../FormInput';
 import { IntegrationCard } from './IntegrationCard';
+import { ResendDominioPropio } from './ResendDominioPropio';
 import {
   conectarBrevo,
   desconectarBrevo,
@@ -82,13 +83,6 @@ function InstruccionesResend() {
         y registrate gratis. Es TU cuenta, no una compartida — cada admin conecta la suya.
       </li>
       <li>
-        <strong>Verificá tu dominio primero</strong> (obligatorio antes de poder mandar nada) — andá directo a{' '}
-        <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="text-one-fucsia hover:underline">
-          resend.com/domains
-        </a>{' '}
-        → <strong>Add Domain</strong> → seguí los pasos para agregar los registros DNS (tipo TXT/MX/CNAME) en tu proveedor de dominio (Cloudflare, GoDaddy, etc.). Sin esto verificado, Resend no deja mandar ningún email o los manda directo a spam — no sirve usar un email de Gmail como remitente acá, tiene que ser un dominio propio verificado.
-      </li>
-      <li>
         <strong>Andá directo a la página de API Keys</strong> —{' '}
         <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-one-fucsia hover:underline">
           resend.com/api-keys
@@ -96,13 +90,18 @@ function InstruccionesResend() {
         (si no carga directo: menú lateral izquierdo → <strong>API Keys</strong>).
       </li>
       <li>
-        <strong>&quot;Create API Key&quot;</strong> → ponele un nombre que reconozcas (ej. &quot;Landings Escencial&quot;) → en <em>Permissions</em> dejala en <strong>Full Access</strong> o <strong>Sending access</strong> (cualquiera de las dos sirve para mandar emails) → si te deja elegir el dominio, elegí el que verificaste en el paso 2 → <strong>Add</strong>.
+        <strong>&quot;Create API Key&quot;</strong> → ponele un nombre que reconozcas (ej. &quot;Landings Escencial&quot;) → en <em>Permissions</em> dejala en <strong>Full Access</strong> (todavía no elegiste ningún dominio, así que <em>Sending access</em> no tiene de dónde elegir) → <strong>Add</strong>.
       </li>
       <li>
         <strong>Copiá el código completo</strong> que empieza con <code className="rounded-one-sm bg-one-oscuro/10 px-1">re_</code> — Resend lo muestra <strong>una sola vez</strong>, no lo vas a poder ver de nuevo después de cerrar esa pantalla.
       </li>
       <li>
         <strong>Pegalo acá arriba</strong>, en el campo &quot;API Key de Resend&quot; de este mismo panel, y guardá — nunca lo pegues en un chat, un email ni ninguna nota aparte.
+      </li>
+      <li>
+        <div className="rounded-one-sm border border-one-cian/30 bg-one-cian/10 p-3">
+          <strong className="text-one-oscuro">Ya no hace falta verificar un dominio a mano</strong> — una vez guardada la clave, este mismo panel te va a ofrecer crear tu subdominio propio (nombre.escencialconsultora.com) y lo verifica solo, sin que toques Hostinger ni resend.com/domains para nada.
+        </div>
       </li>
     </ol>
   );
@@ -125,7 +124,7 @@ export default async function IntegrationsPage() {
       .maybeSingle(),
     supabase
       .from('resend_accounts')
-      .select('api_key_last4, validated_at, plan_tipo, creditos_pago')
+      .select('api_key_last4, validated_at, plan_tipo, creditos_pago, sender_email, dominio_nombre, dominio_estado, dominio_error')
       .eq('user_id', admin?.id ?? '')
       .maybeSingle(),
   ]);
@@ -190,15 +189,24 @@ export default async function IntegrationsPage() {
               !resend?.api_key_last4 && (
                 <div className="space-y-4 rounded-one-sm bg-one-oscuro/5 p-4">
                   <p className="text-xs text-one-oscuro/60">
-                    Todavía no conectaste ninguna cuenta de Resend — completá también el remitente. Tiene que ser un
-                    email de un dominio que ya verificaste en Resend (resend.com/domains), nunca un @gmail.com.
+                    No hace falta cargar remitente todavía — después de guardar la clave, este mismo panel te ofrece
+                    crear tu subdominio de envío propio y lo verifica solo. Si ya tenés un dominio propio verificado
+                    de antes en Resend, opcionalmente completalo acá.
                   </p>
-                  <FormInput id="sender_email" name="sender_email" type="email" label="Email de remitente" placeholder="hola@tudominio.com" required />
-                  <FormInput id="sender_name" name="sender_name" label="Nombre de remitente" placeholder="Escencial Consultora" />
+                  <FormInput id="sender_email" name="sender_email" type="email" label="Email de remitente (opcional)" placeholder="hola@tudominio.com" />
+                  <FormInput id="sender_name" name="sender_name" label="Nombre de remitente (opcional)" placeholder="Escencial Consultora" />
                 </div>
               )
             }
           />
+          {resend?.api_key_last4 && (
+            <ResendDominioPropio
+              dominioNombre={resend.dominio_nombre}
+              dominioEstado={resend.dominio_estado as 'pendiente' | 'verificado' | 'error' | null}
+              dominioError={resend.dominio_error}
+              senderEmail={resend.sender_email}
+            />
+          )}
         </div>
       </div>
 
