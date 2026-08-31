@@ -662,3 +662,146 @@ export async function reintentarEnvio(emailSendId: string) {
   revalidatePath('/admin/campaigns/[id]/leads', 'page');
   return resultado;
 }
+
+// Fila ya mapeada y limpia — SubirLeadsButton.tsx hace el parseo del
+// archivo y el mapeo de columnas del lado del cliente (no hace falta
+// mandar el archivo entero al server, ni conocer acá el formato de
+// ningún CRM en particular). `email` puede venir null (contacto solo
+// con teléfono, ver migración 0033) — el resto de los campos son
+// texto libre, igual que el form público.
+const filaImportarSchema = z.object({
+  email: z.string().trim().max(254).nullable(),
+  nombre: z.string().trim().max(200).nullable(),
+  apellido: z.string().trim().max(200).nullable(),
+  telefono: z.string().trim().max(200).nullable(),
+});
+type FilaImportar = z.infer<typeof filaImportarSchema>;
+
+/**
+ * Carga masiva de leads (2026-08-31, pedido explícito: "así como está
+ * hecho ahora pero el leads, lo cargo yo") — mismo camino que el form
+ * público de la landing (registrar_lead vía RPC), fila por fila: misma
+ * cadencia, mismo dedupe por email/teléfono, mismos créditos. Cero
+ * lógica de envío nueva — un lead cargado acá entra exactamente igual
+ * que uno que se registró solo.
+ *
+ * Solo en campañas ACTIVAS y de goteo normal (no envío personalizado):
+ * el envío personalizado necesita que el lead elija una opción, algo
+ * que una fila de CSV no tiene forma de contestar. Solo activas porque
+ * `scheduled_for` se calcula EN ESTE MOMENTO contra `activated_at` —
+ * cargar leads en una campaña todavía sin activar dejaría fechas mal
+ * calculadas que nadie recalcula después al activarla (mismo motivo
+ * por el que el form público solo funciona con la campaña activa).
+ *
+ * Corta apenas se queda sin crédito (2026-08-26, ver sistema de
+ * créditos) — si la fila 50 de 500 ya no tiene crédito disponible en
+ * este ciclo, las 450 siguientes tampoco lo van a tener: seguir
+ * intentando solo gastaría 450 round-trips a la base para nada.
+ */
+export async function importarLeads(campaignId: string, filasCrudas: unknown[]) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
+  if (!Array.isArray(filasCrudas) || filasCrudas.length === 0) {
+    return { error: 'No hay filas para importar.' };
+  }
+  if (filasCrudas.length > 5000) {
+    return { error: 'Demasiadas filas en un solo archivo (máximo 5000) — dividilo en partes más chicas.' };
+  }
+
+  const filas: FilaImportar[] = [];
+  for (const cruda of filasCrudas) {
+    const parsed = filaImportarSchema.safeParse(cruda);
+    // El cliente (SubirLeadsButton.tsx) ya descarta las filas sin ningún
+    // dato útil antes de mandarlas — este chequeo es solo el mismo
+    // filtro repetido del lado del servidor, por las dudas.
+    if (parsed.success && (parsed.data.email || parsed.data.nombre || parsed.data.apellido || parsed.data.telefono)) {
+      filas.push(parsed.data);
+    }
+  }
+  if (filas.length === 0) {
+    return { error: 'Ninguna fila tiene un formato válido.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+
+  const { data: campana, error: campanaError } = await supabase
+    .from('campaigns')
+    .select('id, status, landings(landing_templates(envio_personalizado))')
+    .eq('id', campaignId)
+    .single();
+
+  if (campanaError || !campana) {
+    return { error: 'La campaña no existe.' };
+  }
+  if (campana.status !== 'active') {
+    return {
+      error: 'Esta campaña no está activa — activala primero (así los emails se agendan con la fecha correcta) y volvé a cargar el archivo.',
+    };
+  }
+
+  const landing = campana.landings as unknown as {
+    landing_templates: { envio_personalizado: boolean } | null;
+  } | null;
+  if (landing?.landing_templates?.envio_personalizado) {
+    return {
+      error:
+        'Esta campaña es de envío personalizado (el lead elige una opción) — la carga masiva todavía no está disponible para este tipo de campaña.',
+    };
+  }
+
+  let nuevos = 0;
+  let duplicados = 0;
+  let sinEmail = 0;
+  let sinCredito = false;
+  let noProcesados = 0;
+
+  for (const fila of filas) {
+    if (sinCredito) {
+      noProcesados++;
+      continue;
+    }
+
+    const { data: resultado, error } = await supabase.rpc('registrar_lead', {
+      p_campaign_id: campaignId,
+      p_email: fila.email ?? '',
+      p_first_name: fila.nombre,
+      p_last_name: fila.apellido,
+      p_phone: fila.telefono ?? '',
+      p_selected_option: null,
+      p_envio_personalizado: false,
+    });
+
+    if (error || !resultado) {
+      console.error('Error en registrar_lead (carga masiva):', error);
+      noProcesados++;
+      continue;
+    }
+
+    const r = resultado as { es_duplicado: boolean; sin_credito?: boolean };
+    if (r.sin_credito) {
+      sinCredito = true;
+      noProcesados++;
+      continue;
+    }
+    if (r.es_duplicado) {
+      duplicados++;
+    } else {
+      nuevos++;
+      if (!fila.email) sinEmail++;
+    }
+  }
+
+  revalidatePath('/admin/campaigns/[id]/leads', 'page');
+
+  return {
+    ok: true as const,
+    total: filas.length,
+    nuevos,
+    duplicados,
+    sinEmail,
+    sinCredito,
+    noProcesados,
+  };
+}

@@ -6,7 +6,9 @@ import { Download, FileSpreadsheet } from 'lucide-react';
 type LeadParaExportar = {
   first_name: string | null;
   last_name: string | null;
-  email: string;
+  // Nullable desde la carga masiva sin email (2026-08-31, ver migración
+  // 0033) — un contacto cargado solo con teléfono.
+  email: string | null;
   phone: string | null;
   selected_option: number | null;
   whatsapp_clicked_at: string | null;
@@ -28,7 +30,7 @@ function filaDeLead(l: LeadParaExportar, esEnvioPersonalizado: boolean): (string
   return [
     l.first_name ?? '',
     l.last_name ?? '',
-    l.email,
+    l.email ?? '',
     l.phone ?? '',
     ...(esEnvioPersonalizado ? [l.selected_option != null ? String(l.selected_option) : ''] : []),
     l.whatsapp_clicked_at ? new Date(l.whatsapp_clicked_at).toLocaleString('es-AR') : 'No',

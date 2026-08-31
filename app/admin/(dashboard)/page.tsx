@@ -109,7 +109,7 @@ export default async function AdminHomePage() {
                     <td className="px-4 py-3 text-one-oscuro">
                       {lead.first_name} {lead.last_name}
                     </td>
-                    <td className="px-4 py-3 text-one-oscuro/60">{lead.email}</td>
+                    <td className="px-4 py-3 text-one-oscuro/60">{lead.email ?? '—'}</td>
                     <td className="px-4 py-3 text-one-oscuro/60">
                       {campana?.name ?? '—'}
                       {campana?.landings?.slug && (

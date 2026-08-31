@@ -5,6 +5,7 @@ import { urlPublicaDeLanding } from '@/lib/dominio-landing';
 import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 import { RetryEnvioButton } from './RetryEnvioButton';
 import { DescargarLeadsButton } from './DescargarLeadsButton';
+import { SubirLeadsButton } from './SubirLeadsButton';
 import { formatFechaHoraAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
@@ -115,11 +116,18 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
             ¿Activa? {estaActiva ? 'Sí' : 'No'}
           </span>
         </h1>
-        <DescargarLeadsButton
-          leads={leads ?? []}
-          nombreCampana={campana?.name ?? 'campana'}
-          esEnvioPersonalizado={esEnvioPersonalizado}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <SubirLeadsButton
+            campaignId={params.id}
+            estaActiva={estaActiva}
+            esEnvioPersonalizado={esEnvioPersonalizado}
+          />
+          <DescargarLeadsButton
+            leads={leads ?? []}
+            nombreCampana={campana?.name ?? 'campana'}
+            esEnvioPersonalizado={esEnvioPersonalizado}
+          />
+        </div>
       </div>
       <p className="mt-1 text-sm text-one-oscuro/60">
         Landing: <span className="font-semibold text-one-oscuro">{linkPublico ?? '—'}</span>
@@ -197,7 +205,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                   <td className="px-4 py-3 text-one-oscuro">
                     {lead.first_name} {lead.last_name}
                   </td>
-                  <td className="px-4 py-3 text-one-oscuro/70">{lead.email}</td>
+                  <td className="px-4 py-3 text-one-oscuro/70">{lead.email ?? '—'}</td>
                   <td className="px-4 py-3 text-one-oscuro/60">{lead.phone ?? '—'}</td>
                   <td className="px-4 py-3">
                     {lead.whatsapp_clicked_at ? (

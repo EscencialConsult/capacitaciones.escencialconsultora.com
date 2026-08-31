@@ -233,7 +233,7 @@ export async function processPendingEmails() {
     resultado.procesados++;
 
     const lead = envio.leads as unknown as {
-      email: string;
+      email: string | null;
       first_name: string | null;
       last_name: string | null;
       campaign_id: string;
@@ -255,6 +255,19 @@ export async function processPendingEmails() {
 
     if (!lead || !paso) {
       await marcarError(supabase, envio.id, 'Faltan datos de lead o de paso de campaña.');
+      resultado.errores++;
+      continue;
+    }
+
+    // Desde la carga masiva de leads (2026-08-31, ver migración 0033)
+    // `leads.email` puede ser null — un contacto cargado solo con
+    // teléfono. registrar_lead() nunca debería agendar un email_sends
+    // para uno de esos (no hay a dónde mandarlo), pero esto es un
+    // segundo cinturón de seguridad: si por lo que sea llegó a existir
+    // una fila así, se marca error en vez de mandarle "to: null" a la
+    // API del proveedor.
+    if (!lead.email) {
+      await marcarError(supabase, envio.id, 'Este lead no tiene email cargado — no se le puede mandar nada.');
       resultado.errores++;
       continue;
     }
