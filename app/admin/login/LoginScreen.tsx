@@ -72,32 +72,40 @@ function FormRegistro() {
 }
 
 // Compartido por /admin/login y por la raíz del dominio (app/page.tsx,
-// 2026-08-25). El registro (`mostrarRegistro`) solo se ofrece desde la
-// raíz — pedido explícito 2026-08-27 ("registrarse desde inicio"), no
-// desde /admin/login.
-export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boolean }) {
+// 2026-08-25). El registro ya se ofrece en las dos entradas (2026-08-28):
+// como el alta también está abierta desde la raíz sin candado, ocultarla
+// acá no sumaba seguridad real, solo confundía a quien entra por la ruta
+// secreta — que es la que un admin usa todos los días.
+export function LoginScreen({ mostrarRegistro = true }: { mostrarRegistro?: boolean }) {
   const [modo, setModo] = useState<'login' | 'registro'>('login');
 
   return (
     <div className="relative min-h-svh overflow-hidden bg-one-oscuro md:h-svh">
       <div className="relative grid min-h-svh md:h-svh md:grid-cols-[3fr_2fr]">
-        {/* Panel izquierdo — marca + propuesta, nítido. La foto de fondo
-            vive acá adentro (no full-bleed): el panel derecho ahora es
-            sólido y no la necesita atrás, así que decodificar la imagen
-            en esa mitad de pantalla sería puro gasto sin nada que mostrar. */}
-        <div className="rise-in relative flex h-56 flex-col justify-between overflow-hidden p-6 md:h-full md:p-12">
-          <Image
-            src="/images/one-fondograndecolor.jpg"
-            alt=""
-            fill
-            priority
-            quality={60}
-            sizes="(min-width: 768px) 60vw, 100vw"
-            className="object-cover"
+        {/* Panel izquierdo — marca + propuesta, nítido. Fondo propio (sin
+            foto de stock): gradiente radial tricolor de la marca ONE sobre
+            oscuro + una textura hexagonal sutil, todo CSS — no depende de
+            decodificar ninguna imagen pesada para esta mitad de pantalla. */}
+        <div className="rise-in relative flex h-56 flex-col justify-between overflow-hidden bg-one-oscuro p-6 md:h-full md:p-12">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `
+                radial-gradient(1100px 650px at 75% 20%, rgba(225,123,215,.22), transparent 55%),
+                radial-gradient(900px 600px at 10% 75%, rgba(107,225,227,.16), transparent 55%),
+                radial-gradient(650px 500px at 50% 100%, rgba(228,199,106,.12), transparent 60%),
+                linear-gradient(180deg, #0a0810, #1a181d)
+              `,
+            }}
             aria-hidden="true"
           />
           <div
-            className="absolute inset-0 bg-gradient-to-t from-one-oscuro/90 via-one-oscuro/20 to-transparent"
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='150'%3E%3Cg fill='none' stroke='%23fefeff' stroke-width='1'%3E%3Cpath d='M50 20l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M120 20l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M190 20l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M85 55l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M155 55l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M50 90l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M120 90l20-12 20 12v24l-20 12-20-12z'/%3E%3Cpath d='M190 90l20-12 20 12v24l-20 12-20-12z'/%3E%3C/g%3E%3C/svg%3E\")",
+              backgroundSize: '260px 150px',
+            }}
             aria-hidden="true"
           />
 
@@ -105,9 +113,9 @@ export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boo
             <Image
               src="/logos/escencial-logoblanco.webp"
               alt="Escencial"
-              width={160}
-              height={40}
-              className="h-9 w-auto"
+              width={240}
+              height={60}
+              className="h-14 w-auto md:h-16"
               priority
             />
           </div>

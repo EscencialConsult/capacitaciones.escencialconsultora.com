@@ -11,21 +11,23 @@ const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
 
 type ItemNav = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean; paso?: number };
 
-// paso 1-2-3 (2026-08-31, pedido explícito: "poné algo que muestre los
-// pasos para una campaña") — el orden real para publicar algo nuevo:
-// armar la plantilla, crear la landing con esa plantilla, crear la
-// campaña que le da contenido y la activa. Un numerito discreto sobre
-// el ícono, no reemplaza el nombre — sigue siendo "Plantillas de
-// landing", solo con una pista de en qué orden usarlas la primera vez.
+// paso 1-2-3-4-5 (2026-08-31, pedido: "poné algo que muestre los pasos
+// para una campaña"; 2026-08-28 reordenado: la lista ahora sigue el
+// mismo orden ascendente que los numeritos — antes el paso 1 aparecía
+// ABAJO de los pasos 2 y 3 en la lista, que quedaba leyéndose 3-2-1).
+// El flujo real para publicar algo nuevo: elegís/creás la marca →
+// armás las plantillas (landing y email) que la usan → armás la
+// landing con la plantilla → creás la campaña que la activa y le da
+// contenido. Un numerito discreto sobre el ícono, no reemplaza el
+// nombre — sigue siendo "Plantillas de landing", solo con una pista
+// de en qué orden usarlas la primera vez.
 const NAV: ItemNav[] = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
-  { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList, paso: 3 },
-  { href: '/admin/landings', label: 'Landings', icon: Rocket, paso: 2 },
-  // Marcas antes de Plantillas (2026-08-28) — es el paso lógico previo:
-  // elegís o creás la marca ANTES de armar una plantilla que la use.
-  { href: '/admin/marcas', label: 'Marcas', icon: Palette },
-  { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate, paso: 1 },
-  { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
+  { href: '/admin/marcas', label: 'Marcas', icon: Palette, paso: 1 },
+  { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate, paso: 2 },
+  { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail, paso: 3 },
+  { href: '/admin/landings', label: 'Landings', icon: Rocket, paso: 4 },
+  { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList, paso: 5 },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/settings/integrations', label: 'Integraciones', icon: Plug },
 ];
