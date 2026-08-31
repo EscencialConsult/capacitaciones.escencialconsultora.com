@@ -21,11 +21,13 @@ const NAV: ItemNav[] = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
   { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList, paso: 3 },
   { href: '/admin/landings', label: 'Landings', icon: Rocket, paso: 2 },
-  // Marcas antes de Plantillas (2026-08-28) — es el paso lógico previo:
-  // elegís o creás la marca ANTES de armar una plantilla que la use.
-  { href: '/admin/marcas', label: 'Marcas', icon: Palette },
   { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate, paso: 1 },
   { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
+  // Marcas movida acá (2026-08-31, pedido explícito: "ponelo arriba de
+  // usuarios y sin número") — se usa una sola vez por marca (se crea y
+  // se olvida), no en cada campaña como los 3 pasos de arriba, así que
+  // no necesita estar mezclada entre ellos ni llevar su propio número.
+  { href: '/admin/marcas', label: 'Marcas', icon: Palette },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/settings/integrations', label: 'Integraciones', icon: Plug },
 ];
@@ -133,7 +135,12 @@ export function DashboardSidebar({
                 <span className="relative inline-flex shrink-0">
                   <Icon className="size-5" strokeWidth={1.75} />
                   {item.paso && (
-                    <span className="absolute -top-1.5 -left-1.5 flex size-3.5 items-center justify-center rounded-full bg-one-fucsia text-[9px] leading-none font-extrabold text-one-negro">
+                    // Más grande + borde oscuro (2026-08-31, "se ve como
+                    // que no se entiende") — un poco más grande y con
+                    // borde propio para que no se pierda contra el
+                    // ícono/fondo detrás, sea cual sea el color de
+                    // ambos.
+                    <span className="absolute -top-2 -left-2 flex size-4 items-center justify-center rounded-full border-2 border-one-oscuro bg-one-fucsia text-[10px] leading-none font-extrabold text-one-negro">
                       {item.paso}
                     </span>
                   )}
