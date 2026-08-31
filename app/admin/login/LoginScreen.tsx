@@ -1,16 +1,51 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Mail, Lock, ArrowRight, User } from 'lucide-react';
 import { signIn, registrarAdmin } from './actions';
 import { AuthInput } from './AuthInput';
 
-// Estructura clonada de AuthLayout.jsx + AuthPage.jsx (COMRURAL): split-screen
-// con una foto de fondo cubriendo todo el panel, izquierda nítida (marca +
-// propuesta), derecha tapada con vidrio translúcido (glassmorphism) para
-// que el form sea legible. Colores/tipografía: kit ONE, no el de COMRURAL.
+/**
+ * Logo grande, recortado con CSS (2026-08-31, pedido explícito: "el
+ * logo está muy chico") — el archivo real (escencial-logoblanco.webp)
+ * es un cuadrado de 500x500 con el wordmark ocupando solo una franja
+ * fina al medio (~100px de esos 500) — a <Image> normal, cuanto más
+ * "alto" se le pide, más espacio transparente de arriba/abajo se lleva
+ * también, así que el texto en sí seguía viéndose chico sin importar
+ * el height pedido. Esto renderiza el archivo como fondo, agrandado y
+ * recortado para mostrar SOLO esa franja — mismo resultado visual que
+ * tener un archivo bien recortado, sin necesitar uno nuevo.
+ */
+function LogoEscencial({ heightPx, className = '' }: { heightPx: number; className?: string }) {
+  const escala = heightPx / 100;
+  return (
+    <div
+      role="img"
+      aria-label="Escencial"
+      className={className}
+      style={{
+        width: 460 * escala,
+        height: heightPx,
+        backgroundImage: 'url(/logos/escencial-logoblanco.webp)',
+        backgroundSize: `${500 * escala}px ${500 * escala}px`,
+        backgroundPosition: '50% 49%',
+        backgroundRepeat: 'no-repeat',
+      }}
+    />
+  );
+}
+
+// Estructura clonada de AuthLayout.jsx + AuthPage.jsx (COMRURAL): split-screen,
+// izquierda nítida (marca + propuesta), derecha con fondo sólido. Colores/
+// tipografía: kit ONE, no el de COMRURAL.
+//
+// Fondo del panel izquierdo (2026-08-31, pedido explícito: "el fondo es
+// feo, eliminalo y generá uno vos") — antes era una foto de stock
+// (one-fondograndecolor.jpg) full-bleed; ahora es 100% CSS (.login-panel-bg,
+// ver globals.css) — gradiente + dos manchas de color + textura de líneas
+// finas, mismo lenguaje visual que el resto del panel admin (.admin-glow),
+// sin ninguna imagen que decodificar.
 function BotonSubmit({ texto, textoPendiente }: { texto: string; textoPendiente: string }) {
   const { pending } = useFormStatus();
   return (
@@ -72,44 +107,20 @@ function FormRegistro() {
 }
 
 // Compartido por /admin/login y por la raíz del dominio (app/page.tsx,
-// 2026-08-25). El registro (`mostrarRegistro`) solo se ofrece desde la
-// raíz — pedido explícito 2026-08-27 ("registrarse desde inicio"), no
-// desde /admin/login.
+// 2026-08-25). El registro (`mostrarRegistro`) se ofrece desde los dos
+// lugares (2026-08-31, antes solo desde la raíz — pedido explícito
+// ahora: "poné para registrarse desde el login") — sigue siendo el
+// mismo alta sin candado de siempre, ver registrarAdmin en actions.ts.
 export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boolean }) {
   const [modo, setModo] = useState<'login' | 'registro'>('login');
 
   return (
     <div className="relative min-h-svh overflow-hidden bg-one-oscuro md:h-svh">
       <div className="relative grid min-h-svh md:h-svh md:grid-cols-[3fr_2fr]">
-        {/* Panel izquierdo — marca + propuesta, nítido. La foto de fondo
-            vive acá adentro (no full-bleed): el panel derecho ahora es
-            sólido y no la necesita atrás, así que decodificar la imagen
-            en esa mitad de pantalla sería puro gasto sin nada que mostrar. */}
-        <div className="rise-in relative flex h-56 flex-col justify-between overflow-hidden p-6 md:h-full md:p-12">
-          <Image
-            src="/images/one-fondograndecolor.jpg"
-            alt=""
-            fill
-            priority
-            quality={60}
-            sizes="(min-width: 768px) 60vw, 100vw"
-            className="object-cover"
-            aria-hidden="true"
-          />
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-one-oscuro/90 via-one-oscuro/20 to-transparent"
-            aria-hidden="true"
-          />
-
+        {/* Panel izquierdo — marca + propuesta, nítido. */}
+        <div className="login-panel-bg rise-in relative flex h-56 flex-col justify-between overflow-hidden p-6 md:h-full md:p-12">
           <div className="relative">
-            <Image
-              src="/logos/escencial-logoblanco.webp"
-              alt="Escencial"
-              width={160}
-              height={40}
-              className="h-9 w-auto"
-              priority
-            />
+            <LogoEscencial heightPx={64} />
           </div>
 
           <div className="relative hidden md:block">
@@ -152,13 +163,7 @@ export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boo
             costo. */}
         <div className="rise-in relative flex flex-col overflow-y-auto bg-one-oscuro px-6 py-8 md:px-14 md:py-12">
           <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
-            <Image
-              src="/logos/escencial-logoblanco.webp"
-              alt="Escencial"
-              width={140}
-              height={36}
-              className="mx-auto mb-8 h-8 w-auto md:hidden"
-            />
+            <LogoEscencial heightPx={48} className="mx-auto mb-8 md:hidden" />
 
             <h1 className="bg-gradient-to-r from-one-fucsia to-one-cian bg-clip-text text-2xl font-extrabold text-transparent">
               {modo === 'login' ? 'Bienvenido' : 'Creá tu cuenta'}
