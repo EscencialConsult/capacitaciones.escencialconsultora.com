@@ -6,6 +6,8 @@ import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 import { RetryEnvioButton } from './RetryEnvioButton';
 import { DescargarLeadsButton } from './DescargarLeadsButton';
 import { SubirLeadsButton } from './SubirLeadsButton';
+import { MarcarVendidosButton } from './MarcarVendidosButton';
+import { MarcarVendidoButton } from './MarcarVendidoButton';
 import { formatFechaHoraAR } from '@/lib/fecha';
 
 export const dynamic = 'force-dynamic';
@@ -69,7 +71,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
     supabase
       .from('leads')
       .select(
-        'id, first_name, last_name, email, phone, selected_option, whatsapp_clicked_at, whatsapp_clicked_step, created_at, email_sends(id, status, scheduled_for, landing_email_step_id, error_message)'
+        'id, first_name, last_name, email, phone, selected_option, whatsapp_clicked_at, whatsapp_clicked_step, vendido_at, created_at, email_sends(id, status, scheduled_for, landing_email_step_id, error_message)'
       )
       .eq('campaign_id', params.id)
       .order('created_at', { ascending: false }),
@@ -122,6 +124,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
             estaActiva={estaActiva}
             esEnvioPersonalizado={esEnvioPersonalizado}
           />
+          <MarcarVendidosButton campaignId={params.id} />
           <DescargarLeadsButton
             leads={leads ?? []}
             nombreCampana={campana?.name ?? 'campana'}
@@ -176,6 +179,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
             'Click WhatsApp',
             ...(esEnvioPersonalizado ? ['Opción elegida'] : []),
             'Etapas de email',
+            'Venta',
             'Ingresó',
           ]}
         />
@@ -263,6 +267,9 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
                       {etapas.length === 0 && <span className="text-one-oscuro/40">—</span>}
                     </div>
                   </td>
+                  <td className="px-4 py-3">
+                    <MarcarVendidoButton leadId={lead.id} vendidoAt={lead.vendido_at} />
+                  </td>
                   <td className="px-4 py-3 text-one-oscuro/60">
                     {formatFechaHoraAR(lead.created_at)}
                   </td>
@@ -270,7 +277,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
               );
             })}
             {(leads ?? []).length === 0 && (
-              <TableEmptyRow colSpan={esEnvioPersonalizado ? 7 : 6}>Todavía no hay leads en esta campaña.</TableEmptyRow>
+              <TableEmptyRow colSpan={esEnvioPersonalizado ? 8 : 7}>Todavía no hay leads en esta campaña.</TableEmptyRow>
             )}
           </tbody>
       </TableShell>

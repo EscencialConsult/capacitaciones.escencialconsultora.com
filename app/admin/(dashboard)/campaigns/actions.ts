@@ -805,3 +805,102 @@ export async function importarLeads(campaignId: string, filasCrudas: unknown[]) 
     noProcesados,
   };
 }
+
+/**
+ * Marcar un lead puntual como vendido (2026-08-31, pedido explícito:
+ * "así no se le siga enviando los emails de las campañas") — botón por
+ * fila en la tabla de leads. Cancela ('skipped') lo que todavía no se
+ * mandó de ese lead; lo ya enviado queda como estaba, no se puede
+ * "desenviar". Ver migración 0034 — la marca y la cancelación son UNA
+ * sola transacción en la base (marcar_lead_vendido), no dos escrituras
+ * sueltas desde acá.
+ */
+export async function marcarLeadVendido(leadId: string) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase.rpc('marcar_lead_vendido', { p_lead_id: leadId });
+
+  if (error || !data) {
+    console.error('Error en marcar_lead_vendido:', error);
+    return { error: 'No se pudo marcar como vendido.' };
+  }
+
+  const r = data as { error?: string; ok?: boolean; ya_estaba?: boolean };
+  if (r.error === 'no_existe') {
+    return { error: 'Este lead ya no existe.' };
+  }
+
+  revalidatePath('/admin/campaigns/[id]/leads', 'page');
+  return { ok: true as const, yaEstaba: r.ya_estaba ?? false };
+}
+
+/**
+ * Marcar vendidos en lote, por email, resubiendo el mismo tipo de
+ * archivo que "Cargar leads" (2026-08-31) — MarcarVendidosButton.tsx
+ * hace el parseo, el mapeo de columnas y el filtro por el valor de
+ * "Estado" del lado del cliente; acá solo llega la lista final de
+ * emails a marcar, ya limpia. Un solo round-trip a la base para todo
+ * el lote (marcar_vendidos_por_email, ver migración 0034) — nada de un
+ * `for` llamando la base fila por fila como en importarLeads (ahí hace
+ * falta porque cada fila puede crear un lead distinto con su propio
+ * agendado; acá es un solo UPDATE masivo, no hay nada que agendar).
+ */
+export async function marcarVendidosDesdeArchivo(campaignId: string, emailsCrudos: unknown[]) {
+  if (!(await requireAdmin())) {
+    return { error: 'No autorizado.' };
+  }
+
+  if (!Array.isArray(emailsCrudos) || emailsCrudos.length === 0) {
+    return { error: 'No hay emails para marcar.' };
+  }
+  if (emailsCrudos.length > 5000) {
+    return { error: 'Demasiados emails en un solo archivo (máximo 5000) — dividilo en partes más chicas.' };
+  }
+
+  const emails = Array.from(
+    new Set(
+      emailsCrudos
+        .filter((e): e is string => typeof e === 'string')
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.length > 0 && e.length <= 254)
+    )
+  );
+  if (emails.length === 0) {
+    return { error: 'Ningún email tiene un formato válido.' };
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const { data: campana, error: campanaError } = await supabase
+    .from('campaigns')
+    .select('id')
+    .eq('id', campaignId)
+    .single();
+  if (campanaError || !campana) {
+    return { error: 'La campaña no existe.' };
+  }
+
+  const { data, error } = await supabase.rpc('marcar_vendidos_por_email', {
+    p_campaign_id: campaignId,
+    p_emails: emails,
+  });
+
+  if (error || !data) {
+    console.error('Error en marcar_vendidos_por_email:', error);
+    return { error: 'No se pudo procesar el archivo.' };
+  }
+
+  const r = data as { marcados: number; encontrados: number };
+  revalidatePath('/admin/campaigns/[id]/leads', 'page');
+
+  return {
+    ok: true as const,
+    totalEmails: emails.length,
+    encontrados: r.encontrados,
+    marcados: r.marcados,
+    yaEstaban: r.encontrados - r.marcados,
+    noEncontrados: emails.length - r.encontrados,
+  };
+}
