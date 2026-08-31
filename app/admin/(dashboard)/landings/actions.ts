@@ -5,10 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { processPendingEmails } from '@/lib/email/process-pending';
+import { publicarSubdominioDeLanding, despublicarSubdominioDeLanding } from '@/lib/dominio-landing';
 
 // Slugs que nunca pueden ser el link de una landing — colisionan con
-// rutas reales de la app (ver app/[slug]/route.ts).
-const SLUGS_RESERVADOS = ['admin', 'api'];
+// rutas reales de la app (ver app/[slug]/route.ts) o, desde 2026-08-31,
+// con el propio host del panel una vez que el slug se puede publicar
+// como subdominio (capacitaciones.escencialconsultora.com — ver
+// middleware.ts y lib/dominio-landing.ts). "www" reservado por las
+// dudas, es el subdominio más común de todos para colisionar sin querer.
+const SLUGS_RESERVADOS = ['admin', 'api', 'capacitaciones', 'www'];
 
 const landingSchema = z.object({
   slug: z
@@ -42,6 +47,31 @@ function parseLandingForm(formData: FormData) {
 }
 
 /**
+ * Publica el subdominio propio (slug.escencialconsultora.com) y graba
+ * el resultado en la fila — SIEMPRE después de que la landing ya se
+ * guardó bien, nunca antes: si esto falla, la landing sigue 100%
+ * accesible por su link clásico (ver lib/dominio-landing.ts). No se usa
+ * `await` bloqueante desde el punto de vista del admin porque total, si
+ * tarda unos segundos, el redirect de todas formas ya pasó — se llama
+ * ANTES del redirect acá, es una espera corta (2 llamadas HTTP), no
+ * vale la pena la complejidad de hacerlo fire-and-forget de verdad.
+ */
+async function publicarYGrabar(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  landingId: string,
+  slug: string
+): Promise<void> {
+  const resultado = await publicarSubdominioDeLanding(slug);
+  await supabase
+    .from('landings')
+    .update({
+      subdominio_publicado_en: resultado.ok ? new Date().toISOString() : undefined,
+      subdominio_error: resultado.ok ? null : resultado.error,
+    })
+    .eq('id', landingId);
+}
+
+/**
  * La Landing es el link público en sí (slug + plantilla + categoría) —
  * se crea independiente de cualquier campaña. El contenido/asesora/
  * emails se cargan después conectando una campaña (ver
@@ -56,13 +86,17 @@ export async function createLanding(_prevState: { error?: string } | undefined, 
   if ('error' in parsed) return { error: parsed.error };
 
   const supabase = createSupabaseServiceClient();
-  const { error } = await supabase.from('landings').insert(parsed.data);
+  const { data: creada, error } = await supabase.from('landings').insert(parsed.data).select('id').single();
 
-  if (error) {
-    if (error.code === '23505') return { error: 'Ya existe una landing con ese link.' };
+  if (error || !creada) {
+    if (error?.code === '23505') return { error: 'Ya existe una landing con ese link.' };
     console.error('Error creando landing:', error);
     return { error: 'No se pudo crear la landing.' };
   }
+
+  // Best effort — si falla, la landing ya está creada y funciona igual
+  // por su link clásico (capacitaciones.escencialconsultora.com/slug).
+  await publicarYGrabar(supabase, creada.id, parsed.data.slug);
 
   revalidatePath('/admin/landings');
   redirect('/admin/landings');
@@ -114,7 +148,7 @@ export async function updateLanding(
   // bloqueo es sobre el template_id de la landing.
   const { data: actual, error: actualError } = await supabase
     .from('landings')
-    .select('template_id')
+    .select('template_id, slug, subdominio_error')
     .eq('id', landingId)
     .single();
 
@@ -144,6 +178,23 @@ export async function updateLanding(
     if (error.code === '23505') return { error: 'Ya existe otra landing con ese link.' };
     console.error('Error actualizando landing:', error);
     return { error: 'No se pudo actualizar la landing.' };
+  }
+
+  const slugCambio = actual.slug !== parsed.data.slug;
+
+  // Si el slug cambió, el subdominio VIEJO ya no corresponde a nada —
+  // se saca (best effort, no bloquea nada) antes de publicar el nuevo.
+  if (slugCambio) {
+    await despublicarSubdominioDeLanding(actual.slug);
+  }
+
+  // Solo se vuelve a publicar si el slug cambió, o si el último intento
+  // había quedado con error (guardar de nuevo = reintentar, sin
+  // necesidad de un botón aparte) — así una edición normal (cambiar
+  // solo el nombre o la plantilla) no dispara 2 llamadas HTTP externas
+  // de más en cada guardado.
+  if (slugCambio || actual.subdominio_error) {
+    await publicarYGrabar(supabase, landingId, parsed.data.slug);
   }
 
   revalidatePath('/admin/landings');
@@ -187,6 +238,11 @@ export async function deleteLanding(landingId: string) {
   }
 
   const supabase = createSupabaseServiceClient();
+
+  // Se necesita el slug para poder limpiar el subdominio DESPUÉS de
+  // borrar — una vez borrada la fila, ya no hay de dónde leerlo.
+  const { data: landing } = await supabase.from('landings').select('slug').eq('id', landingId).single();
+
   const { error } = await supabase.from('landings').delete().eq('id', landingId);
 
   if (error) {
@@ -196,6 +252,10 @@ export async function deleteLanding(landingId: string) {
     console.error('Error eliminando landing:', error);
     return { error: 'No se pudo eliminar la landing.' };
   }
+
+  // Best effort — no bloquea el borrado si falla, ver
+  // despublicarSubdominioDeLanding.
+  if (landing) await despublicarSubdominioDeLanding(landing.slug);
 
   revalidatePath('/admin/landings');
 }
@@ -245,6 +305,11 @@ export async function createLandingInline(_prevState: { error?: string } | undef
     console.error('Error creando landing (acceso directo):', error);
     return { error: 'No se pudo crear la landing.' };
   }
+
+  // Best effort, igual que createLanding — si falla, la landing igual
+  // funciona por su link clásico. El estado queda visible en
+  // /admin/landings, no hace falta mostrarlo acá en el modal.
+  await publicarYGrabar(supabase, data.id, parsed.data.slug);
 
   revalidatePath('/admin/landings');
   revalidatePath('/admin/campaigns');

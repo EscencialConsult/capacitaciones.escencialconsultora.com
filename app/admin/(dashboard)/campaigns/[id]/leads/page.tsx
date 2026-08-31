@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Check, Clock, X, Minus } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { urlPublicaDeLanding } from '@/lib/dominio-landing';
 import { TableShell, TableHead, TableEmptyRow } from '../../../AdminTable';
 import { RetryEnvioButton } from './RetryEnvioButton';
 import { DescargarLeadsButton } from './DescargarLeadsButton';
@@ -56,7 +57,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
   const [{ data: campana }, { data: pasos }, { data: leads }] = await Promise.all([
     supabase
       .from('campaigns')
-      .select('id, name, status, landings(name, slug, landing_templates(name, envio_personalizado))')
+      .select('id, name, status, landings(name, slug, subdominio_publicado_en, subdominio_error, landing_templates(name, envio_personalizado))')
       .eq('id', params.id)
       .single(),
     supabase
@@ -76,8 +77,16 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
   const landing = campana?.landings as unknown as {
     name: string;
     slug: string;
+    subdominio_publicado_en: string | null;
+    subdominio_error: string | null;
     landing_templates: { name: string; envio_personalizado: boolean } | null;
   } | null;
+  const linkPublico =
+    landing && landing.subdominio_publicado_en && !landing.subdominio_error
+      ? urlPublicaDeLanding(landing.slug).replace('https://', '')
+      : landing
+        ? `/${landing.slug}`
+        : null;
   const pasosConfigurados = pasos ?? [];
   const estaActiva = campana?.status === 'active';
   // Campaña de envío personalizado (ver landing_templates.envio_personalizado
@@ -113,7 +122,7 @@ export default async function CampaignLeadsPage({ params }: { params: { id: stri
         />
       </div>
       <p className="mt-1 text-sm text-one-oscuro/60">
-        Landing: <span className="font-semibold text-one-oscuro">{landing ? `/${landing.slug}` : '—'}</span>
+        Landing: <span className="font-semibold text-one-oscuro">{linkPublico ?? '—'}</span>
         {' · '}
         Plantilla: <span className="font-semibold text-one-oscuro">{landing?.landing_templates?.name ?? '—'}</span>
         {' · '}

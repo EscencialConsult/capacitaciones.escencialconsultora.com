@@ -22,8 +22,43 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  * lo expondría). El arreglo en ese caso es simple: volver a entrar por
  * el link guardado.
  */
+// Subdominio propio por landing (2026-08-31, pedido explícito) — el
+// link de una landing puede ser slug.escencialconsultora.com además del
+// clásico capacitaciones.escencialconsultora.com/slug (que sigue
+// funcionando igual, sin tocar nada). Mismo sitio de Netlify sirve TODO
+// (panel + todas las landings): acá solo se distingue por el header
+// Host si esta request "es" el panel o "es" una landing puntual, y en
+// ese segundo caso se reescribe la ruta / hacia /slug por dentro, sin
+// que la barra de direcciones del visitante cambie. Cualquier OTRA ruta
+// en ese mismo host (/api/leads, /api/track, assets) sigue de largo sin
+// tocarse — ya funciona igual sea cual sea el Host, porque es el mismo
+// deploy. Ver lib/dominio-landing.ts para cómo se crea cada subdominio.
+const DOMINIO_LANDINGS = 'escencialconsultora.com';
+const HOSTS_QUE_NO_SON_LANDING = new Set(['capacitaciones', 'www']);
+
+function slugDesdeHost(host: string | null): string | null {
+  if (!host) return null;
+  const hostSinPuerto = host.split(':')[0].toLowerCase();
+  if (!hostSinPuerto.endsWith(`.${DOMINIO_LANDINGS}`)) return null;
+  const label = hostSinPuerto.slice(0, -(`.${DOMINIO_LANDINGS}`.length));
+  // Un subdominio de un solo nivel (curso-ventas), nunca uno con puntos
+  // adentro (algo.otra-cosa) — eso no es un slug de landing válido.
+  if (!label || label.includes('.') || HOSTS_QUE_NO_SON_LANDING.has(label)) return null;
+  return label;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname === '/') {
+    const slug = slugDesdeHost(request.headers.get('host'));
+    if (slug) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/${slug}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
   const secreto = process.env.ADMIN_SECRET_PATH;
 
   let pathDestino = pathname;

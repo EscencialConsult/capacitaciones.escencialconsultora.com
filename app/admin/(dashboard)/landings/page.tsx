@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Pencil } from 'lucide-react';
+import { Pencil, TriangleAlert } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { urlPublicaDeLanding } from '@/lib/dominio-landing';
 import { EnviarPendientesButton } from './EnviarPendientesButton';
 import { LandingToggleActivaButton } from './LandingToggleActivaButton';
 import { deleteLanding } from './actions';
@@ -20,7 +21,7 @@ export default async function LandingsPage() {
 
   const { data: landings } = await supabase
     .from('landings')
-    .select('id, slug, name, is_active, landing_templates(name), campaigns(id, name, status)')
+    .select('id, slug, name, is_active, subdominio_publicado_en, subdominio_error, landing_templates(name), campaigns(id, name, status)')
     .order('created_at', { ascending: false });
 
   return (
@@ -59,15 +60,43 @@ export default async function LandingsPage() {
                       deja TODAS las filas a la misma altura; el texto
                       completo sigue disponible con el `title` nativo. */}
                   <td className="px-4 py-3">
-                    <a
-                      href={`/${l.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={`/${l.slug}`}
-                      className="block max-w-[160px] truncate font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
-                    >
-                      /{l.slug}
-                    </a>
+                    {/* Subdominio propio (2026-08-31, pedido explícito: "que
+                        vaya el nombre de la landing antes del dominio") — se
+                        muestra como link principal SOLO si ya se confirmó
+                        publicado y sin error; si no, el link clásico /slug
+                        (que siempre funciona, ver app/[slug]/route.ts) sigue
+                        siendo el que se ve. subdominio_error avisa sin
+                        bloquear nada — la landing en sí nunca depende de esto. */}
+                    {l.subdominio_publicado_en && !l.subdominio_error ? (
+                      <a
+                        href={urlPublicaDeLanding(l.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={urlPublicaDeLanding(l.slug)}
+                        className="block max-w-[180px] truncate font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
+                      >
+                        {l.slug}.escencialconsultora.com
+                      </a>
+                    ) : (
+                      <a
+                        href={`/${l.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`/${l.slug}`}
+                        className="block max-w-[160px] truncate font-medium text-one-oscuro transition-colors duration-150 hover:text-one-fucsia hover:underline"
+                      >
+                        /{l.slug}
+                      </a>
+                    )}
+                    {l.subdominio_error && (
+                      <span
+                        title={l.subdominio_error}
+                        className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-one-dorado"
+                      >
+                        <TriangleAlert className="size-3" strokeWidth={2.5} />
+                        sin subdominio propio
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-one-oscuro">
                     <span className="block max-w-xs truncate" title={l.name}>
