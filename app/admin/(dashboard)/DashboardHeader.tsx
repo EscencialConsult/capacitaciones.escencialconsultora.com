@@ -25,24 +25,28 @@ function normalizar(texto: string) {
     .toLowerCase();
 }
 
+/** fucsia mientras hay margen, dorado cerca del límite, rojo en o sobre
+ * el límite — mismo criterio que BarraCreditos (ver profile/page.tsx). */
+function colorSegunPorcentaje(porcentaje: number): string {
+  return porcentaje >= 100 ? 'text-one-rojo' : porcentaje >= 80 ? 'text-one-dorado' : 'text-one-fucsia';
+}
+
 /**
  * Contador de créditos del header (2026-08-28, pedido explícito: "que
  * esté a la par del user, arriba a la derecha") — versión chica del
  * medidor de /admin/profile, siempre visible sin tener que navegar ahí.
- * Mismo criterio de color con significado que BarraCreditos (ver
- * profile/page.tsx): fucsia mientras hay margen, dorado cerca del
- * límite, rojo en o sobre el límite. Si total es 0 (sin ninguna cuenta
- * conectada a este usuario) se muestra igual, atenuado — mejor que
- * desaparecer sin avisar que ese admin no tiene capacidad de envío propia.
+ * Si total es 0 (sin ninguna cuenta conectada a este usuario) se
+ * muestra igual, atenuado — mejor que desaparecer sin avisar que ese
+ * admin no tiene capacidad de envío propia.
  *
- * Diario, no solo mensual (2026-08-31, pedido explícito: "el contador
- * hacelo diario también, porque tengo varios límites diario") — Brevo/
- * Google cortan por día en los hechos (300/día, 500-2.000/día), no solo
- * por mes. El número grande pasa a ser el de HOY (lo que de verdad
- * puede frenar un envío en cualquier momento) cuando hay algún límite
- * diario real conectado; si no (ej. solo Resend, que no publica tope
- * diario), cae al mensual de siempre — nunca "sin cuenta" mientras haya
- * algo conectado. El tooltip siempre muestra los dos números.
+ * Diario Y mensual, los dos a la vista (2026-08-31, pedido explícito
+ * dos veces: "el contador hacelo diario también" y después "me
+ * dejaste solo el de hoy, deben estar los dos") — Brevo/Google cortan
+ * por día en los hechos (300/día, 500-2.000/día), no solo por mes, así
+ * que ninguno de los dos numeritos sobra: cada uno se colorea según SU
+ * propio porcentaje (uno puede estar en rojo sin que el otro lo esté).
+ * "Hoy" se omite del todo solo si ninguna cuenta conectada tiene tope
+ * diario conocido (ej. solo Resend) — ahí no hay nada real que mostrar.
  */
 function CreditosBadge({
   total,
@@ -57,30 +61,41 @@ function CreditosBadge({
 }) {
   const sinCuenta = total === 0;
   const hayLimiteDiario = limiteDiario > 0;
-  const numerador = hayLimiteDiario ? usadoHoy : usado;
-  const denominador = hayLimiteDiario ? limiteDiario : total;
-  const porcentaje = denominador > 0 ? (numerador / denominador) * 100 : 0;
-  const color = sinCuenta
-    ? 'text-one-oscuro/35'
-    : porcentaje >= 100
-      ? 'text-one-rojo'
-      : porcentaje >= 80
-        ? 'text-one-dorado'
-        : 'text-one-fucsia';
+  const porcentajeMes = total > 0 ? (usado / total) * 100 : 0;
+  const porcentajeHoy = limiteDiario > 0 ? (usadoHoy / limiteDiario) * 100 : 0;
 
-  const tooltip = sinCuenta
-    ? 'Sin cuenta de envío conectada — ver Mi perfil'
-    : `Hoy: ${usadoHoy.toLocaleString('es-AR')}${hayLimiteDiario ? ` / ${limiteDiario.toLocaleString('es-AR')}` : ' (sin tope diario)'} · Este mes: ${usado.toLocaleString('es-AR')} / ${total.toLocaleString('es-AR')}`;
+  if (sinCuenta) {
+    return (
+      <Link
+        href="/admin/profile"
+        title="Sin cuenta de envío conectada — ver Mi perfil"
+        className="hidden items-center gap-1.5 rounded-full bg-one-oscuro/5 px-3 py-1.5 text-xs font-bold text-one-oscuro/35 transition-colors duration-150 hover:bg-one-oscuro/10 md:flex"
+      >
+        <Zap className="size-3.5" strokeWidth={2.25} />
+        Sin cuenta
+      </Link>
+    );
+  }
 
   return (
     <Link
       href="/admin/profile"
-      title={tooltip}
-      className="hidden items-center gap-1.5 rounded-full bg-one-oscuro/5 px-3 py-1.5 text-xs font-bold transition-colors duration-150 hover:bg-one-oscuro/10 md:flex"
+      title="Créditos de envío — ver el detalle en Mi perfil"
+      className="hidden items-center gap-2.5 rounded-full bg-one-oscuro/5 px-3 py-1.5 text-xs font-bold transition-colors duration-150 hover:bg-one-oscuro/10 md:flex"
     >
-      <Zap className={`size-3.5 ${color}`} strokeWidth={2.25} />
-      <span className={color}>
-        {sinCuenta ? 'Sin cuenta' : `${numerador.toLocaleString('es-AR')} / ${denominador.toLocaleString('es-AR')}${hayLimiteDiario ? ' hoy' : ''}`}
+      <Zap className="size-3.5 text-one-oscuro/40" strokeWidth={2.25} />
+      {hayLimiteDiario && (
+        <>
+          <span className={colorSegunPorcentaje(porcentajeHoy)}>
+            {usadoHoy.toLocaleString('es-AR')} / {limiteDiario.toLocaleString('es-AR')}
+            <span className="ml-1 font-semibold text-one-oscuro/40">hoy</span>
+          </span>
+          <span className="text-one-oscuro/20">·</span>
+        </>
+      )}
+      <span className={colorSegunPorcentaje(porcentajeMes)}>
+        {usado.toLocaleString('es-AR')} / {total.toLocaleString('es-AR')}
+        <span className="ml-1 font-semibold text-one-oscuro/40">mes</span>
       </span>
     </Link>
   );
