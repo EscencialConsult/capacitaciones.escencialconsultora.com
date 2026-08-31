@@ -142,6 +142,50 @@
   background: rgba(107, 225, 227, 0.12); /* one-cian */
 }
 
+/* Fondo del panel izquierdo del login (2026-08-31, pedido explícito:
+   "el fondo es feo, eliminalo y generá uno vos" — reemplaza una foto de
+   stock que había ahí) — mismo criterio que .admin-glow (dos manchas de
+   color en esquinas opuestas, blur grande, opacidad baja) más una
+   textura geométrica sutil (líneas finas cruzadas, ver SISTEMA_DISENO_
+   LANDING en lib/landing-template-defaults.ts → "Fondos"), todo CSS,
+   sin ninguna imagen que decodificar. absolute (no fixed): este fondo
+   vive DENTRO del panel izquierdo, no de toda la pantalla. */
+.login-panel-bg {
+  background:
+    linear-gradient(135deg, #1a181d 0%, #100f13 55%, #000000 100%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.035) 0px,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 1px,
+      transparent 26px
+    );
+}
+.login-panel-bg::before,
+.login-panel-bg::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.login-panel-bg::before {
+  top: -140px;
+  right: -120px;
+  width: 420px;
+  height: 420px;
+  background: rgba(225, 123, 215, 0.22); /* one-fucsia */
+  filter: blur(100px);
+}
+.login-panel-bg::after {
+  bottom: -160px;
+  left: -100px;
+  width: 380px;
+  height: 380px;
+  background: rgba(107, 225, 227, 0.16); /* one-cian */
+  filter: blur(100px);
+}
+
 /* Entrada escalonada de listas/grids (tarjetas de stats, filas de
    tabla) — mismo timing/easing que .rise-in, con un delay creciente
    por posición vía --stagger-index (seteado inline en cada ítem).
