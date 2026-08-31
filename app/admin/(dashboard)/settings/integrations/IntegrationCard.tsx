@@ -7,7 +7,7 @@ import { inputClass, labelClass } from '../../FormInput';
 import { iconActionClass, IconActionGlyph } from '../../IconAction';
 import { formatFechaLargaAR } from '@/lib/fecha';
 
-type EstadoAccion = { error?: string; ok?: true };
+export type EstadoAccion = { error?: string; ok?: true };
 type AccionConectar = (prevState: EstadoAccion | undefined, formData: FormData) => Promise<EstadoAccion>;
 
 /**
@@ -19,7 +19,7 @@ type AccionConectar = (prevState: EstadoAccion | undefined, formData: FormData) 
  * 0019) — el día que haya un plan pago de verdad, no hace falta tocar
  * código, alcanza con que este número refleje lo que el proveedor da.
  */
-function PlanPagoStub({
+export function PlanPagoStub({
   planTipo,
   creditosPago,
   creditosFreeCalculados,

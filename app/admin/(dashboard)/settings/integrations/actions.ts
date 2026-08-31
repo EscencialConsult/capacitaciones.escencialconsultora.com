@@ -1,11 +1,15 @@
 'use server';
 
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { randomBytes } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server';
 import { encryptSecret, decryptSecret, ultimos4 } from '@/lib/crypto';
 import { formatoValido, validarApiKey } from '@/lib/integrations/validate';
 import { crearDominioResend, verificarDominioResend } from '@/lib/dominio-resend';
+import { obtenerConfigGoogle, urlAutorizacionGoogle } from '@/lib/google-oauth';
 
 type Resultado = { error?: string; ok?: true };
 
@@ -342,6 +346,83 @@ export async function verificarDominioPropioResend(): Promise<Resultado> {
         dominio_error: `Estado actual en Resend: "${resultado.status}" — el DNS puede tardar unos minutos en propagar. Volvé a intentar en un rato.`,
       })
       .eq('id', cuenta.id);
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+// ── Conectar Google (2026-08-31) — OAuth, nunca una API key pegada ──
+// A diferencia de Brevo/Resend, acá no hay ningún formulario: el admin
+// tira un click y Google se encarga del resto. Ver lib/google-oauth.ts
+// para el intercambio de tokens (pasa por el route handler de
+// settings/integrations/google/callback, no por acá).
+
+export async function iniciarConexionGoogle() {
+  const admin = await requireAdmin();
+  if (!admin) redirect('/admin/login');
+
+  const config = await obtenerConfigGoogle();
+  if (!config) {
+    // No debería poder pasar (el botón solo se muestra si ya está
+    // configurado, ver GoogleIntegrationCard) — red de seguridad por si
+    // alguien lo intenta con la pestaña vieja abierta.
+    redirect('/admin/settings/integrations');
+  }
+
+  // CSRF: un valor random que viaja en la URL de Google y se vuelve a
+  // comparar contra esta misma cookie cuando Google redirige de vuelta
+  // (ver el route handler del callback) — sin esto, cualquiera podría
+  // mandarle a un admin logueado un link de callback con un `code`
+  // ajeno y conectar SU cuenta de Google a la de otra persona.
+  const state = randomBytes(16).toString('hex');
+  cookies().set('google_oauth_state', state, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 300,
+    path: '/',
+  });
+
+  redirect(urlAutorizacionGoogle(config.clientId, state));
+}
+
+export async function desconectarGoogle(): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase.from('google_accounts').delete().eq('user_id', admin.id);
+
+  if (error) {
+    console.error('Error desconectando Google:', error);
+    return { error: 'No se pudo desconectar. Probá de nuevo.' };
+  }
+
+  revalidatePath('/admin/settings/integrations');
+  return { ok: true };
+}
+
+export async function declararPlanGoogle(formData: FormData): Promise<Resultado> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: 'No autorizado.' };
+
+  const raw = Object.fromEntries(formData) as Record<string, string>;
+  const parsed = planPagoSchema.safeParse(raw);
+  if (!parsed.success) return { error: 'Datos inválidos.' };
+
+  const supabase = createSupabaseServiceClient();
+  const { error } = await supabase
+    .from('google_accounts')
+    .update({
+      plan_tipo: parsed.data.plan_tipo,
+      creditos_pago: parsed.data.plan_tipo === 'pago' ? (parsed.data.creditos_pago ?? null) : null,
+    })
+    .eq('user_id', admin.id);
+
+  if (error) {
+    console.error('Error guardando el plan de Google:', error);
+    return { error: 'No se pudo guardar. Probá de nuevo.' };
   }
 
   revalidatePath('/admin/settings/integrations');

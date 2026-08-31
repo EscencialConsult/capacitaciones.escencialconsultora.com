@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { replacePlaceholders } from '@/lib/templates';
 import { HTML_EMAIL_BASE } from '@/lib/landing-template-defaults';
 import { decryptSecret } from '@/lib/crypto';
+import { obtenerConfigGoogle, enviarPorGmail } from '@/lib/google-oauth';
 
 /**
  * Reemplazo de enviarPendientes (Script B del sistema viejo). Recorre
@@ -24,13 +25,10 @@ import { decryptSecret } from '@/lib/crypto';
  */
 const MINUTOS_PROCESSING_HUERFANO = 15;
 
-type CuentaEnvio = {
-  proveedor: 'resend' | 'brevo';
-  apiKey: string;
-  senderEmail: string;
-  senderName: string;
-  cuentaId: string;
-};
+type CuentaEnvio =
+  | { proveedor: 'brevo'; apiKey: string; senderEmail: string; senderName: string; cuentaId: string }
+  | { proveedor: 'resend'; apiKey: string; senderEmail: string; senderName: string; cuentaId: string }
+  | { proveedor: 'google'; refreshToken: string; senderEmail: string; senderName: string; cuentaId: string };
 
 /**
  * Panel de Integraciones (2026-08-24) — si un admin conectó/actualizó
@@ -93,8 +91,8 @@ async function resolverCuentaDeEnvio(
 
   if (cache.has(activatedBy)) return cache.get(activatedBy)!;
 
-  // Orden Brevo → Resend → (Google, a futuro — mencionado, todavía sin
-  // implementar) — pedido explícito (2026-08-26). Brevo primero porque
+  // Orden Brevo → Resend → Google (2026-08-31, los tres implementados)
+  // — pedido explícito (2026-08-26). Brevo primero porque
   // ya es el remitente establecido (mejor reputación de entrega hoy);
   // Resend queda de respaldo si Brevo no está conectada para este
   // usuario. Ojo: Brevo sigue exigiendo que su restricción de "IPs
@@ -152,11 +150,31 @@ async function resolverCuentaDeEnvio(
     }
   }
 
-  // TODO (futuro, solo mencionado por ahora — 2026-08-26): Google como
-  // tercer proveedor de respaldo. Cuando se implemente, va acá abajo,
-  // después de Resend — mismo patrón: tabla propia (google_accounts?),
-  // su propia FK en email_sends (ver resend_account_id, migración
-  // 0022, mismo criterio), resuelto por usuario igual que los otros dos.
+  // Google, 3er proveedor (2026-08-31) — conectado por OAuth (ver
+  // lib/google-oauth.ts), no por API key pegada. senderEmail acá es la
+  // cuenta de Gmail real del admin (Gmail exige que el remitente sea
+  // esa misma cuenta autenticada, no cualquier dirección a elección).
+  const { data: google } = await supabase
+    .from('google_accounts')
+    .select('id, google_email, refresh_token_encrypted')
+    .eq('user_id', activatedBy)
+    .maybeSingle();
+
+  if (google) {
+    try {
+      const cuenta: CuentaEnvio = {
+        proveedor: 'google',
+        refreshToken: decryptSecret(google.refresh_token_encrypted),
+        senderEmail: google.google_email,
+        senderName: google.google_email,
+        cuentaId: google.id,
+      };
+      cache.set(activatedBy, cuenta);
+      return cuenta;
+    } catch (err) {
+      console.error(`Error desencriptando el refresh_token de Google del usuario ${activatedBy}:`, err);
+    }
+  }
 
   cache.set(activatedBy, null);
   return null;
@@ -204,6 +222,12 @@ export async function processPendingEmails() {
 
   const webappUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
   const cacheCuentas = new Map<string, CuentaEnvio | null>();
+  // Se pide una sola vez por corrida (no por email) — el Client ID/
+  // Secret son de toda la plataforma, no cambian entre un envío y otro.
+  // null si Google todavía no está configurado a nivel plataforma (ver
+  // /admin/superadmin) — en ese caso ningún admin puede tener una
+  // cuenta de Google conectada de verdad, así que nunca hace falta acá.
+  const configGoogle = await obtenerConfigGoogle();
 
   for (const envio of pendientes ?? []) {
     resultado.procesados++;
@@ -251,7 +275,7 @@ export async function processPendingEmails() {
 
     if (!cuenta) {
       const mensaje = lead.campaigns.activated_by
-        ? `El dueño de esta campaña no tiene ninguna cuenta de envío conectada (Brevo o Resend) — conectá una desde Integraciones.`
+        ? `El dueño de esta campaña no tiene ninguna cuenta de envío conectada (Brevo, Resend o Google) — conectá una desde Integraciones.`
         : 'No hay ninguna cuenta de Brevo activa configurada para campañas sin dueño.';
       await marcarError(supabase, envio.id, mensaje);
       await registrarAlerta(supabase, `email_sin_cuenta_${lead.campaigns.activated_by ?? 'legado'}`, mensaje);
@@ -298,20 +322,34 @@ export async function processPendingEmails() {
         asesora_nombre: lead.campaigns?.advisor_name ?? '',
       });
 
-      const cuerpo =
-        cuenta.proveedor === 'resend'
-          ? await enviarPorResend(cuenta.apiKey, {
-              from: `${cuenta.senderName} <${cuenta.senderEmail}>`,
-              to: [lead.email],
-              subject: paso.subject,
-              html,
-            })
-          : await enviarPorBrevo(cuenta.apiKey, {
-              sender: { name: cuenta.senderName, email: cuenta.senderEmail },
-              to: [{ email: lead.email }],
-              subject: paso.subject,
-              htmlContent: html,
-            });
+      let cuerpo: { messageId?: string };
+      if (cuenta.proveedor === 'resend') {
+        cuerpo = await enviarPorResend(cuenta.apiKey, {
+          from: `${cuenta.senderName} <${cuenta.senderEmail}>`,
+          to: [lead.email],
+          subject: paso.subject,
+          html,
+        });
+      } else if (cuenta.proveedor === 'brevo') {
+        cuerpo = await enviarPorBrevo(cuenta.apiKey, {
+          sender: { name: cuenta.senderName, email: cuenta.senderEmail },
+          to: [{ email: lead.email }],
+          subject: paso.subject,
+          htmlContent: html,
+        });
+      } else {
+        if (!configGoogle) {
+          throw new Error('Google ya no está configurado a nivel plataforma (revisar /admin/superadmin).');
+        }
+        await enviarPorGmail(configGoogle.clientId, configGoogle.clientSecret, cuenta.refreshToken, {
+          to: lead.email,
+          from: cuenta.senderEmail,
+          fromName: cuenta.senderName,
+          subject: paso.subject,
+          html,
+        });
+        cuerpo = {};
+      }
 
       // Bug real confirmado (2026-08-26, causa raíz de "queda en
       // processing para siempre") — brevo_account_id tiene FK a
@@ -334,6 +372,7 @@ export async function processPendingEmails() {
           brevo_message_id: cuerpo.messageId ?? null,
           brevo_account_id: cuenta.proveedor === 'brevo' ? cuenta.cuentaId : null,
           resend_account_id: cuenta.proveedor === 'resend' ? cuenta.cuentaId : null,
+          google_account_id: cuenta.proveedor === 'google' ? cuenta.cuentaId : null,
         })
         .eq('id', envio.id);
 

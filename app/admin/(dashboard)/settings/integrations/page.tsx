@@ -108,7 +108,11 @@ function InstruccionesResend() {
   );
 }
 
-export default async function IntegrationsPage() {
+export default async function IntegrationsPage({
+  searchParams,
+}: {
+  searchParams: { google_ok?: string; google_error?: string };
+}) {
   const admin = await requireAdmin();
   const supabase = createSupabaseServiceClient();
 
@@ -117,7 +121,7 @@ export default async function IntegrationsPage() {
   // sistema de créditos (ver migración 0019) cobra según de quién es
   // la cuenta que activó cada campaña, así que lo que se ve/conecta
   // acá tiene que ser exactamente lo que ESTE admin va a consumir.
-  const [{ data: brevo }, { data: resend }, { data: googleConfig }] = await Promise.all([
+  const [{ data: brevo }, { data: resend }, { data: googleConfig }, { data: google }] = await Promise.all([
     supabase
       .from('brevo_accounts')
       .select('api_key_encrypted, api_key_last4, validated_at, daily_limit, plan_tipo, creditos_pago')
@@ -129,6 +133,11 @@ export default async function IntegrationsPage() {
       .eq('user_id', admin?.id ?? '')
       .maybeSingle(),
     supabase.from('google_oauth_config').select('id').eq('id', 1).maybeSingle(),
+    supabase
+      .from('google_accounts')
+      .select('google_email, tipo_cuenta, plan_tipo, creditos_pago')
+      .eq('user_id', admin?.id ?? '')
+      .maybeSingle(),
   ]);
 
   const brevoConectado = !!brevo?.api_key_encrypted;
@@ -141,6 +150,17 @@ export default async function IntegrationsPage() {
         suyas, y de ahí salen tus créditos mensuales (ver Mi perfil). No hace falta tocar código ni variables de
         entorno — pegá la clave acá, la validamos con el proveedor y listo.
       </p>
+
+      {searchParams.google_ok && (
+        <p className="mt-4 rounded-one-sm bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          Google conectado correctamente.
+        </p>
+      )}
+      {searchParams.google_error && (
+        <p className="mt-4 rounded-one-sm border border-one-rojo/40 bg-one-rojo/10 px-3 py-2 text-sm text-one-oscuro">
+          {searchParams.google_error}
+        </p>
+      )}
 
       <div className="mt-6 space-y-5">
         <div style={{ '--stagger-index': 0 } as React.CSSProperties} className="stagger-in">
@@ -212,7 +232,14 @@ export default async function IntegrationsPage() {
         </div>
 
         <div style={{ '--stagger-index': 2 } as React.CSSProperties} className="stagger-in">
-          <GoogleIntegrationCard configuradoAlgunavez={!!googleConfig} />
+          <GoogleIntegrationCard
+            configuradoAlgunavez={!!googleConfig}
+            conectado={!!google}
+            googleEmail={google?.google_email ?? null}
+            tipoCuenta={(google?.tipo_cuenta as 'personal' | 'workspace') ?? null}
+            planTipo={(google?.plan_tipo as 'free' | 'pago') ?? 'free'}
+            creditosPago={google?.creditos_pago}
+          />
         </div>
       </div>
 
