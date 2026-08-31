@@ -32,13 +32,34 @@ function normalizar(texto: string) {
  * Mismo criterio de color con significado que BarraCreditos (ver
  * profile/page.tsx): fucsia mientras hay margen, dorado cerca del
  * límite, rojo en o sobre el límite. Si total es 0 (sin ninguna cuenta
- * Brevo/Resend conectada a este usuario) se muestra igual, atenuado —
- * mejor que desaparecer sin avisar que ese admin no tiene capacidad de
- * envío propia.
+ * conectada a este usuario) se muestra igual, atenuado — mejor que
+ * desaparecer sin avisar que ese admin no tiene capacidad de envío propia.
+ *
+ * Diario, no solo mensual (2026-08-31, pedido explícito: "el contador
+ * hacelo diario también, porque tengo varios límites diario") — Brevo/
+ * Google cortan por día en los hechos (300/día, 500-2.000/día), no solo
+ * por mes. El número grande pasa a ser el de HOY (lo que de verdad
+ * puede frenar un envío en cualquier momento) cuando hay algún límite
+ * diario real conectado; si no (ej. solo Resend, que no publica tope
+ * diario), cae al mensual de siempre — nunca "sin cuenta" mientras haya
+ * algo conectado. El tooltip siempre muestra los dos números.
  */
-function CreditosBadge({ total, usado }: { total: number; usado: number }) {
+function CreditosBadge({
+  total,
+  usado,
+  limiteDiario,
+  usadoHoy,
+}: {
+  total: number;
+  usado: number;
+  limiteDiario: number;
+  usadoHoy: number;
+}) {
   const sinCuenta = total === 0;
-  const porcentaje = total > 0 ? (usado / total) * 100 : 0;
+  const hayLimiteDiario = limiteDiario > 0;
+  const numerador = hayLimiteDiario ? usadoHoy : usado;
+  const denominador = hayLimiteDiario ? limiteDiario : total;
+  const porcentaje = denominador > 0 ? (numerador / denominador) * 100 : 0;
   const color = sinCuenta
     ? 'text-one-oscuro/35'
     : porcentaje >= 100
@@ -47,15 +68,19 @@ function CreditosBadge({ total, usado }: { total: number; usado: number }) {
         ? 'text-one-dorado'
         : 'text-one-fucsia';
 
+  const tooltip = sinCuenta
+    ? 'Sin cuenta de envío conectada — ver Mi perfil'
+    : `Hoy: ${usadoHoy.toLocaleString('es-AR')}${hayLimiteDiario ? ` / ${limiteDiario.toLocaleString('es-AR')}` : ' (sin tope diario)'} · Este mes: ${usado.toLocaleString('es-AR')} / ${total.toLocaleString('es-AR')}`;
+
   return (
     <Link
       href="/admin/profile"
-      title={sinCuenta ? 'Sin cuenta de envío conectada — ver Mi perfil' : `${usado.toLocaleString('es-AR')} de ${total.toLocaleString('es-AR')} créditos usados este ciclo`}
+      title={tooltip}
       className="hidden items-center gap-1.5 rounded-full bg-one-oscuro/5 px-3 py-1.5 text-xs font-bold transition-colors duration-150 hover:bg-one-oscuro/10 md:flex"
     >
       <Zap className={`size-3.5 ${color}`} strokeWidth={2.25} />
       <span className={color}>
-        {sinCuenta ? 'Sin cuenta' : `${usado.toLocaleString('es-AR')} / ${total.toLocaleString('es-AR')}`}
+        {sinCuenta ? 'Sin cuenta' : `${numerador.toLocaleString('es-AR')} / ${denominador.toLocaleString('es-AR')}${hayLimiteDiario ? ' hoy' : ''}`}
       </span>
     </Link>
   );
@@ -69,11 +94,15 @@ export function DashboardHeader({
   avatar,
   creditosTotal,
   creditosUsados,
+  limiteDiario,
+  usadoHoy,
 }: {
   email: string | null;
   avatar: string | null;
   creditosTotal: number;
   creditosUsados: number;
+  limiteDiario: number;
+  usadoHoy: number;
 }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState('');
@@ -163,7 +192,7 @@ export function DashboardHeader({
         )}
       </div>
 
-      <CreditosBadge total={creditosTotal} usado={creditosUsados} />
+      <CreditosBadge total={creditosTotal} usado={creditosUsados} limiteDiario={limiteDiario} usadoHoy={usadoHoy} />
 
       <Link
         href="/admin/profile"

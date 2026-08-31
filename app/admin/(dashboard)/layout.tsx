@@ -24,16 +24,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // crédito. Dos RPCs livianas (ya existían, ver migración 0019), en
   // paralelo con el resto del layout — no bloquean el render del resto
   // del panel más de lo que ya tardaba.
+  // Límite diario, no solo mensual (2026-08-31, pedido explícito: "el
+  // contador hacelo diario también, porque tengo varios límites diario")
+  // — Brevo/Google cortan por día en los hechos, no solo por mes (ver
+  // migración 0031). limiteDiario en 0 = ninguna cuenta con tope diario
+  // conocido conectada (ej. solo Resend) — el badge cae solo al
+  // mensual, ver CreditosBadge en DashboardHeader.tsx.
   let creditosTotal = 0;
   let creditosUsados = 0;
+  let limiteDiario = 0;
+  let usadoHoy = 0;
   if (userId) {
     const admin = createSupabaseServiceClient();
-    const [{ data: total }, { data: usados }] = await Promise.all([
+    const [{ data: total }, { data: usados }, { data: limDiario }, { data: usoHoy }] = await Promise.all([
       admin.rpc('creditos_mensuales_de', { p_user_id: userId }),
       admin.rpc('creditos_usados_ciclo_actual', { p_user_id: userId }),
+      admin.rpc('limite_diario_de', { p_user_id: userId }),
+      admin.rpc('creditos_usados_hoy', { p_user_id: userId }),
     ]);
     creditosTotal = total ?? 0;
     creditosUsados = usados ?? 0;
+    limiteDiario = limDiario ?? 0;
+    usadoHoy = usoHoy ?? 0;
   }
 
   return (
@@ -47,7 +59,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="relative z-10 flex w-full">
         <DashboardSidebar avatar={avatar} email={email} esSuperAdmin={esSuperAdmin(email)} />
         <div className="flex flex-1 flex-col overflow-y-auto">
-          <DashboardHeader email={email} avatar={avatar} creditosTotal={creditosTotal} creditosUsados={creditosUsados} />
+          <DashboardHeader
+            email={email}
+            avatar={avatar}
+            creditosTotal={creditosTotal}
+            creditosUsados={creditosUsados}
+            limiteDiario={limiteDiario}
+            usadoHoy={usadoHoy}
+          />
           {/* Sin max-w (2026-08-25, pedido explícito) — con el tope
               anterior (max-w-6xl, 1152px) sobraba muchísimo espacio
               vacío a los costados en cualquier pantalla ancha real;

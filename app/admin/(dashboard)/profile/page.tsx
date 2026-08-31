@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { Zap, TrendingUp } from 'lucide-react';
+import { Zap, TrendingUp, CalendarClock } from 'lucide-react';
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ProfileAvatarForm } from './ProfileAvatarForm';
 
@@ -59,20 +59,26 @@ export default async function ProfilePage() {
   let disponibleTotal = 0;
   let usado = 0;
   let inicioCiclo: string | null = null;
+  let limiteDiario = 0;
+  let usadoHoy = 0;
   let campanas: { id: string; name: string; status: string; leads: number; creditos: number }[] = [];
 
   if (user) {
     const admin = createSupabaseServiceClient();
-    const [{ data: total }, { data: consumido }, { data: inicio }, { data: campanasPropias }] = await Promise.all([
+    const [{ data: total }, { data: consumido }, { data: inicio }, { data: limDiario }, { data: usoHoy }, { data: campanasPropias }] = await Promise.all([
       admin.rpc('creditos_mensuales_de', { p_user_id: user.id }),
       admin.rpc('creditos_usados_ciclo_actual', { p_user_id: user.id }),
       admin.rpc('inicio_ciclo_creditos'),
+      admin.rpc('limite_diario_de', { p_user_id: user.id }),
+      admin.rpc('creditos_usados_hoy', { p_user_id: user.id }),
       admin.from('campaigns').select('id, name, status').eq('activated_by', user.id).order('created_at', { ascending: false }),
     ]);
 
     disponibleTotal = total ?? 0;
     usado = consumido ?? 0;
     inicioCiclo = inicio ?? null;
+    limiteDiario = limDiario ?? 0;
+    usadoHoy = usoHoy ?? 0;
 
     const idsPropios = (campanasPropias ?? []).map((c) => c.id);
 
@@ -123,14 +129,38 @@ export default async function ProfilePage() {
           <h2 className="text-sm font-bold text-one-oscuro">Créditos de envío</h2>
           <p className="mt-1 text-xs text-one-oscuro/40">
             Se reservan al registrarse cada lead en una campaña que vos activaste — no por cada email que
-            efectivamente sale. Ciclo mensual, se renueva el día 25.
+            efectivamente sale. Ciclo mensual (se renueva el día 25) y, en las cuentas que lo tienen
+            (Brevo, Google), también un tope real por día.
           </p>
 
-          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-one-oscuro/50">
+                <CalendarClock className="size-3.5" strokeWidth={2} />
+                Hoy
+              </div>
+              {limiteDiario > 0 ? (
+                <>
+                  <p className="mt-1 text-2xl font-extrabold text-one-oscuro">
+                    {usadoHoy.toLocaleString('es-AR')}
+                    <span className="text-sm font-semibold text-one-oscuro/40"> / {limiteDiario.toLocaleString('es-AR')}</span>
+                  </p>
+                  <div className="mt-2">
+                    <BarraCreditos usado={usadoHoy} total={limiteDiario} />
+                  </div>
+                  <p className="mt-1 text-xs text-one-oscuro/40">
+                    {Math.max(0, limiteDiario - usadoHoy).toLocaleString('es-AR')} disponibles hoy
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-one-oscuro/40">Sin tope diario en tus cuentas conectadas.</p>
+              )}
+            </div>
+
             <div>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-one-oscuro/50">
                 <Zap className="size-3.5" strokeWidth={2} />
-                En vivo (ya reservado)
+                En vivo (este mes)
               </div>
               <p className="mt-1 text-2xl font-extrabold text-one-oscuro">
                 {usado.toLocaleString('es-AR')}
@@ -159,7 +189,7 @@ export default async function ProfilePage() {
           {disponibleTotal === 0 && (
             <p className="mt-4 rounded-one-sm bg-one-dorado/10 px-3 py-2 text-xs text-one-oscuro/70">
               No tenés ninguna cuenta de envío conectada — sin crédito disponible no vas a poder activar
-              campañas. Conectá Brevo o Resend desde Integraciones.
+              campañas. Conectá Brevo, Resend o Google desde Integraciones.
             </p>
           )}
         </div>
