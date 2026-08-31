@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { esSuperAdmin } from '@/lib/superadmin';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
 
@@ -44,7 +45,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // el resto del shell (sidebar/header ya viven acá, no por pantalla).
     <div className="admin-glow relative flex min-h-svh overflow-hidden bg-one-blanco">
       <div className="relative z-10 flex w-full">
-        <DashboardSidebar avatar={avatar} email={email} />
+        <DashboardSidebar avatar={avatar} email={email} esSuperAdmin={esSuperAdmin(email)} />
         <div className="flex flex-1 flex-col overflow-y-auto">
           <DashboardHeader email={email} avatar={avatar} creditosTotal={creditosTotal} creditosUsados={creditosUsados} />
           {/* Sin max-w (2026-08-25, pedido explícito) — con el tope

@@ -2,6 +2,7 @@ import { createSupabaseServiceClient, requireAdmin } from '@/lib/supabase/server
 import { FormInput } from '../../FormInput';
 import { IntegrationCard } from './IntegrationCard';
 import { ResendDominioPropio } from './ResendDominioPropio';
+import { GoogleIntegrationCard } from './GoogleIntegrationCard';
 import {
   conectarBrevo,
   desconectarBrevo,
@@ -116,7 +117,7 @@ export default async function IntegrationsPage() {
   // sistema de créditos (ver migración 0019) cobra según de quién es
   // la cuenta que activó cada campaña, así que lo que se ve/conecta
   // acá tiene que ser exactamente lo que ESTE admin va a consumir.
-  const [{ data: brevo }, { data: resend }] = await Promise.all([
+  const [{ data: brevo }, { data: resend }, { data: googleConfig }] = await Promise.all([
     supabase
       .from('brevo_accounts')
       .select('api_key_encrypted, api_key_last4, validated_at, daily_limit, plan_tipo, creditos_pago')
@@ -127,6 +128,7 @@ export default async function IntegrationsPage() {
       .select('api_key_last4, validated_at, plan_tipo, creditos_pago, sender_email, dominio_nombre, dominio_estado, dominio_error')
       .eq('user_id', admin?.id ?? '')
       .maybeSingle(),
+    supabase.from('google_oauth_config').select('id').eq('id', 1).maybeSingle(),
   ]);
 
   const brevoConectado = !!brevo?.api_key_encrypted;
@@ -207,6 +209,10 @@ export default async function IntegrationsPage() {
               senderEmail={resend.sender_email}
             />
           )}
+        </div>
+
+        <div style={{ '--stagger-index': 2 } as React.CSSProperties} className="stagger-in">
+          <GoogleIntegrationCard configuradoAlgunavez={!!googleConfig} />
         </div>
       </div>
 

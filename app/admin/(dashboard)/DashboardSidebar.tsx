@@ -4,12 +4,14 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug, Palette } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug, Palette, ShieldCheck } from 'lucide-react';
 import { Avatar } from './Avatar';
 
 const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
 
-const NAV = [
+type ItemNav = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+
+const NAV: ItemNav[] = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
   { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList },
   { href: '/admin/landings', label: 'Landings', icon: Rocket },
@@ -22,14 +24,28 @@ const NAV = [
   { href: '/admin/settings/integrations', label: 'Integraciones', icon: Plug },
 ];
 
+// Solo se agrega para quien es superadmin (ver esSuperAdmin en el
+// layout) — config de toda la plataforma, no de un admin puntual (hoy:
+// Client ID/Secret de Google OAuth). El resto de los admins ni lo ve.
+const NAV_SUPERADMIN: ItemNav = { href: '/admin/superadmin', label: 'Superadmin', icon: ShieldCheck };
+
 // Mecánica clonada 1:1 de DashboardSidebar.jsx (COMRURAL): estado persistido
 // en localStorage, logo con fade cruzado (no swap de src), handle propio en
 // el borde ADEMÁS del logo como toggle (redundante a propósito), timing
 // compartido entre <aside>, label de texto e ítem de nav — ver globals.css.
-export function DashboardSidebar({ avatar, email }: { avatar: string | null; email: string | null }) {
+export function DashboardSidebar({
+  avatar,
+  email,
+  esSuperAdmin,
+}: {
+  avatar: string | null;
+  email: string | null;
+  esSuperAdmin: boolean;
+}) {
   const pathname = usePathname();
   const [colapsado, setColapsado] = useState(false);
   const [montado, setMontado] = useState(false);
+  const nav = esSuperAdmin ? [...NAV, NAV_SUPERADMIN] : NAV;
 
   // useLayoutEffect (no useEffect) para leer la preferencia guardada ANTES de
   // que el navegador pinte: evita el flash de sidebar expandido -> colapsado
@@ -90,7 +106,7 @@ export function DashboardSidebar({ avatar, email }: { avatar: string | null; ema
         </button>
 
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const activo = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
             const Icon = item.icon;
             return (
