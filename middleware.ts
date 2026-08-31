@@ -99,9 +99,37 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: errorUser } = await supabase.auth.getUser();
+
+  // DIAGNÓSTICO TEMPORAL (2026-08-31) — 404 real y reproducible en el
+  // callback de Google OAuth, con sesión supuestamente activa. Borrar
+  // este bloque en cuanto se encuentre la causa.
+  if (pathDestino === '/admin/settings/integrations/google/callback') {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/system_alerts?on_conflict=source`, {
+        method: 'POST',
+        headers: {
+          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          source: 'diagnostico_google_callback',
+          message: JSON.stringify({
+            userEncontrado: !!user,
+            errorUser: errorUser?.message ?? null,
+            cookiesNombres: request.cookies.getAll().map((c) => c.name),
+            vinoPorElSecreto,
+          }),
+          last_seen_at: new Date().toISOString(),
+          resolved_at: null,
+        }),
+      });
+    } catch {
+      // Nunca bloquear el flujo real por el diagnóstico en sí.
+    }
+  }
 
   if (esRaiz) {
     const response = user
