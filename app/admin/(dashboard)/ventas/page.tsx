@@ -40,6 +40,7 @@ export default async function VentasAnaliticaPage() {
     { count: confirmadas },
     { count: rechazadas },
     { data: ventasConfirmadas },
+    { data: revisadasRecientes },
   ] = await Promise.all([
     supabase.from('ventas').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
     supabase.from('ventas').select('id', { count: 'exact', head: true }).eq('estado', 'confirmada'),
@@ -48,6 +49,16 @@ export default async function VentasAnaliticaPage() {
       .from('ventas')
       .select('monto, campaign_id, campaigns(name)')
       .eq('estado', 'confirmada'),
+    // "Revisadas hace poco" (2026-09-01, movida acá desde /revisar,
+    // pedido explícito: "solo pendientes [en revisar], no los que ya
+    // se haya aprobado, ya que eso se debería ver en otro apartado del
+    // inicio de ventas").
+    supabase
+      .from('ventas')
+      .select('id, nombre, apellido, programa, estado, revisado_en, campaign:campaigns(name)')
+      .in('estado', ['confirmada', 'rechazada'])
+      .order('revisado_en', { ascending: false })
+      .limit(10),
   ]);
 
   const confirmadasData = ventasConfirmadas ?? [];
@@ -147,6 +158,36 @@ export default async function VentasAnaliticaPage() {
           </div>
         )}
       </div>
+
+      {(revisadasRecientes ?? []).length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-bold text-one-oscuro/70">Revisadas hace poco</h2>
+          <div className="mt-3 flex flex-col gap-1.5">
+            {(revisadasRecientes ?? []).map((v) => {
+              const camp = v.campaign as unknown as { name: string } | null;
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-3 rounded-one-sm border border-one-oscuro/5 bg-one-blanco/40 px-4 py-2 text-xs text-one-oscuro/60"
+                >
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${
+                      v.estado === 'confirmada' ? 'bg-emerald-50 text-emerald-600' : 'bg-one-oscuro/5 text-one-oscuro/40'
+                    }`}
+                  >
+                    {v.estado === 'confirmada' ? 'Confirmada' : 'Rechazada'}
+                  </span>
+                  <span className="text-one-oscuro">
+                    {v.nombre} {v.apellido}
+                  </span>
+                  {v.programa && <span className="text-one-oscuro/40">— {v.programa}</span>}
+                  {camp && <span className="ml-auto text-one-oscuro/40">{camp.name}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
