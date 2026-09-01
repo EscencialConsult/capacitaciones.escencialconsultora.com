@@ -1,37 +1,32 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-import { limpiarEmailCrm } from '@/lib/leads-import';
+import { ingerirVentas } from '@/lib/ventas-import';
 import { registrarAlerta } from '@/lib/email/process-pending';
 
 /**
- * Sync automático de ventas (2026-08-31, pedido explícito: "debe ser de
- * un modo automático") — recibe la planilla de ventas completa, mandada
- * por un Apps Script instalado en una hoja de Google Sheets (no importa
- * si es la original o una copia armada con IMPORTRANGE — Facundo no es
- * dueño de la original, así que arma la suya propia con IMPORTRANGE,
- * que es de solo lectura hacia la fuente, y el Apps Script va sobre esa
- * copia). Cada fila que matchea por email contra un lead existente (en
- * CUALQUIER campaña, ver marcar_vendidos_por_email_global) se marca
- * vendida y se le cancela lo que le quedaba pendiente de mandar.
+ * Sync automático de ventas (2026-08-31/09-01, pedido explícito) —
+ * recibe la planilla de ventas completa, mandada por un Apps Script
+ * instalado en una hoja de Google Sheets propia de Facundo (mirror de
+ * solo lectura de la original vía IMPORTRANGE — no es dueño de la
+ * original). Ya NO marca nada solo (ver migración 0036, reemplaza el
+ * comportamiento de la migración 0035): cada fila nueva entra a la
+ * cola de revisión `ventas`, con una sugerencia de lead/campaña si el
+ * motor de lib/ventas-import.ts encontró algo razonable — la
+ * confirmación real (marcar vendido, cancelar lo pendiente) pasa por
+ * /admin/ventas, a mano.
  *
- * Formato del body — igual a lo que manda getDataRange().getValues() de
- * Apps Script serializado con JSON.stringify: la primera fila son los
- * encabezados reales de la planilla (los que sean, no se asume ningún
- * formato fijo), el resto son los datos. Mismo criterio que
- * MarcarVendidosButton.tsx: adivina la columna de email por el texto
- * del encabezado en vez de asumir una posición fija.
+ * Formato del body — igual a lo que manda getDataRange().getValues()
+ * de Apps Script serializado con JSON.stringify: la primera fila son
+ * los encabezados reales de la planilla, el resto son los datos.
  *
- * Autenticación: token compartido en vez de sesión — quien llama acá es
- * un Apps Script, no un browser logueado. Sin esto, cualquiera que
- * adivine la URL podría marcar leads como vendidos (cancela emails
- * agendados — no es un GET inocuo). El token vive en VENTAS_SYNC_TOKEN.
+ * Autenticación: token compartido en vez de sesión — quien llama acá
+ * es un Apps Script, no un browser logueado. El token vive en
+ * VENTAS_SYNC_TOKEN.
  */
 const bodySchema = z.object({
   datos: z.array(z.array(z.unknown())).max(20000, 'Demasiadas filas en un solo envío.'),
 });
-
-const PISTA_EMAIL = /correo|e-?mail/i;
 
 export async function POST(request: Request) {
   const tokenEsperado = process.env.VENTAS_SYNC_TOKEN;
@@ -65,49 +60,28 @@ export async function POST(request: Request) {
   const supabase = createSupabaseServiceClient();
 
   if (filas.length < 2) {
-    // Solo encabezado (o vacío) — no es un error, puede ser la primera
-    // corrida sobre una planilla todavía sin filas de datos.
-    return NextResponse.json({ ok: true, marcados: 0, encontrados: 0 });
+    return NextResponse.json({ ok: true, nuevas: 0 });
   }
 
   const [encabezados, ...resto] = filas;
-  const idxEmail = encabezados.findIndex((h) => PISTA_EMAIL.test(String(h ?? '')));
+  const encabezadosTexto = encabezados.map((h) => String(h ?? ''));
 
-  if (idxEmail < 0) {
+  const resumen = await ingerirVentas(supabase, encabezadosTexto, resto);
+
+  if (resumen.columnasFaltantes.length > 0) {
     await registrarAlerta(
       supabase,
-      'ventas_sync_sin_columna_email',
-      `El sync de ventas recibió ${filas.length} filas pero ninguna columna de encabezado matchea "email"/"correo". Encabezados recibidos: ${encabezados.map((h) => String(h ?? '')).join(', ')}`
+      'ventas_sync_columnas_faltantes',
+      `El sync de ventas no encontró estas columnas esperadas en el encabezado: ${resumen.columnasFaltantes.join(', ')}. Encabezados recibidos: ${encabezadosTexto.join(', ')}`
     );
-    return NextResponse.json({ ok: false, error: 'No se encontró una columna de email en el encabezado.' }, { status: 422 });
   }
-
-  const emails = Array.from(
-    new Set(
-      resto
-        .map((fila) => limpiarEmailCrm(fila[idxEmail]))
-        .filter((e): e is string => !!e)
-        .map((e) => e.toLowerCase())
-    )
-  );
-
-  if (emails.length === 0) {
+  if (resumen.sinFecha > 0) {
     await registrarAlerta(
       supabase,
-      'ventas_sync_sin_emails_validos',
-      `El sync de ventas recibió ${resto.length} filas de datos pero ninguna tiene un email válido en la columna "${encabezados[idxEmail]}".`
+      'ventas_sync_filas_sin_fecha',
+      `El sync de ventas encontró ${resumen.sinFecha} filas sin una "Marca temporal" interpretable — se saltearon (no hay clave de dedupe sin fecha).`
     );
-    return NextResponse.json({ ok: true, marcados: 0, encontrados: 0 });
   }
 
-  const { data, error } = await supabase.rpc('marcar_vendidos_por_email_global', { p_emails: emails });
-
-  if (error || !data) {
-    console.error('Error en marcar_vendidos_por_email_global:', error);
-    await registrarAlerta(supabase, 'ventas_sync_error_rpc', `Falló marcar_vendidos_por_email_global: ${error?.message}`);
-    return NextResponse.json({ ok: false, error: 'No se pudo procesar el sync.' }, { status: 500 });
-  }
-
-  const r = data as { marcados: number; encontrados: number };
-  return NextResponse.json({ ok: true, totalEmails: emails.length, ...r });
+  return NextResponse.json({ ok: true, ...resumen });
 }

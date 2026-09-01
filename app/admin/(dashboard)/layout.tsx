@@ -48,6 +48,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     usadoHoy = usoHoy ?? 0;
   }
 
+  // Badge de "Ventas" en el sidebar (2026-09-01, ver /admin/ventas) —
+  // global, no por admin: cualquiera puede revisar cualquier venta
+  // pendiente, así que el conteo no se filtra por userId.
+  const supabase = createSupabaseServiceClient();
+  const { count: ventasPendientes } = await supabase
+    .from('ventas')
+    .select('id', { count: 'exact', head: true })
+    .eq('estado', 'pendiente');
+
   return (
     // .admin-glow (ver globals.css) — dos manchas de color fixed detrás de
     // todo, opacidad muy baja; bg-one-dots es la grilla de puntos sutil del
@@ -57,7 +66,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // el resto del shell (sidebar/header ya viven acá, no por pantalla).
     <div className="admin-glow relative flex min-h-svh overflow-hidden bg-one-blanco">
       <div className="relative z-10 flex w-full">
-        <DashboardSidebar avatar={avatar} email={email} esSuperAdmin={esSuperAdmin(email)} />
+        <DashboardSidebar
+          avatar={avatar}
+          email={email}
+          esSuperAdmin={esSuperAdmin(email)}
+          ventasPendientes={ventasPendientes ?? 0}
+        />
         <div className="flex flex-1 flex-col overflow-y-auto">
           <DashboardHeader
             email={email}

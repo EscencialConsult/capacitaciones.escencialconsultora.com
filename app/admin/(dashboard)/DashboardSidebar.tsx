@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug, Palette, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Rocket, LayoutTemplate, Mail, Users, Plug, Palette, ShieldCheck, DollarSign } from 'lucide-react';
 import { Avatar } from './Avatar';
 
 const CLAVE_COLAPSADO = 'landings_sidebar_colapsado';
@@ -20,6 +20,11 @@ type ItemNav = { href: string; label: string; icon: typeof LayoutDashboard; exac
 const NAV: ItemNav[] = [
   { href: '/admin', label: 'Inicio', icon: LayoutDashboard, exact: true },
   { href: '/admin/campaigns', label: 'Campañas', icon: ClipboardList, paso: 3 },
+  // Ventas (2026-09-01, pedido explícito) — cola de revisión de ventas
+  // sin confirmar, ver el badge más abajo (ventasPendientes). No lleva
+  // paso: no es parte del flujo de armar una campaña nueva, es algo que
+  // se revisa aparte, cuando corresponda.
+  { href: '/admin/ventas', label: 'Ventas', icon: DollarSign },
   { href: '/admin/landings', label: 'Landings', icon: Rocket, paso: 2 },
   { href: '/admin/templates', label: 'Plantillas de landing', icon: LayoutTemplate, paso: 1 },
   { href: '/admin/email-templates', label: 'Plantillas de email', icon: Mail },
@@ -45,10 +50,12 @@ export function DashboardSidebar({
   avatar,
   email,
   esSuperAdmin,
+  ventasPendientes,
 }: {
   avatar: string | null;
   email: string | null;
   esSuperAdmin: boolean;
+  ventasPendientes: number;
 }) {
   const pathname = usePathname();
   const [colapsado, setColapsado] = useState(false);
@@ -125,6 +132,10 @@ export function DashboardSidebar({
           {nav.map((item) => {
             const activo = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
             const Icon = item.icon;
+            // Badge de pendientes (2026-09-01, "Ventas") — punto rojo
+            // solo cuando el sidebar está colapsado (no hay lugar para
+            // un número ahí), número real cuando está expandido.
+            const conBadge = item.href === '/admin/ventas' && ventasPendientes > 0;
             return (
               <Link
                 key={item.href}
@@ -144,8 +155,16 @@ export function DashboardSidebar({
                       {item.paso}
                     </span>
                   )}
+                  {conBadge && colapsado && (
+                    <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-one-rojo" />
+                  )}
                 </span>
                 <span className={`sidebar-label ${colapsado ? 'is-oculto' : ''}`}>{item.label}</span>
+                {conBadge && !colapsado && (
+                  <span className="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full bg-one-rojo text-[10px] leading-none font-extrabold text-one-blanco">
+                    {ventasPendientes > 99 ? '99+' : ventasPendientes}
+                  </span>
+                )}
               </Link>
             );
           })}

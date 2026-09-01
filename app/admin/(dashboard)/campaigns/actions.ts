@@ -524,9 +524,13 @@ export async function pauseCampaign(campaignId: string) {
   }
 
   const supabase = createSupabaseServiceClient();
+  // deactivated_at (2026-09-01, ver migración 0036) — "hasta cuándo
+  // estuvo activa" esta campaña, para el sistema de revisión de ventas
+  // (/admin/ventas): sin esto no se puede saber si una venta cayó
+  // dentro de la ventana en que esta campaña estuvo vigente.
   const { data, error } = await supabase
     .from('campaigns')
-    .update({ status: 'paused', updated_at: new Date().toISOString() })
+    .update({ status: 'paused', deactivated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', campaignId)
     .eq('status', 'active')
     .select('id');
@@ -567,6 +571,14 @@ export async function archiveCampaign(campaignId: string) {
   }
 
   const supabase = createSupabaseServiceClient();
+  // deactivated_at solo si todavía no tenía uno (2026-09-01, ver
+  // migración 0036) — si ya se había pausado antes, ESA es la fecha
+  // real de "hasta cuándo estuvo activa", no la de archivado (que
+  // puede ser mucho después); no pisarla. Dos escrituras porque
+  // Supabase no deja expresar un coalesce condicional en un solo
+  // .update() sin una función en la base.
+  await supabase.from('campaigns').update({ deactivated_at: new Date().toISOString() }).eq('id', campaignId).is('deactivated_at', null);
+
   const { data, error } = await supabase
     .from('campaigns')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
