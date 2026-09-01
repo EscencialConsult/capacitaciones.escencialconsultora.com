@@ -142,44 +142,24 @@
   background: rgba(107, 225, 227, 0.12); /* one-cian */
 }
 
-/* Fondo del panel izquierdo del login (2026-08-31, rediseñado — "se ve
-   horrible" con la primera versión: los blobs medían un tamaño FIJO en
-   px, así que en una pantalla grande de verdad quedaban chiquitos en
-   una esquina y el resto del panel se veía vacío/negro — antes esa
-   zona la tapaba la foto de stock que se sacó, así que el vacío recién
-   se notó al reemplazarla). Ahora los blobs miden un % del panel (con
-   vmin, escalan con cualquier tamaño de pantalla) y se suma el isotipo
-   de ONE gigante y muy tenue como elemento de marca real ocupando el
-   espacio del medio — no es relleno genérico, es la marca de la
-   plataforma (ver SISTEMA_DISENO_LANDING → "Elemento insignia" en
-   lib/landing-template-defaults.ts: siempre algo específico, nunca un
-   fondo vacío ni un patrón sin relación con el contenido). */
+/* Fondo del panel izquierdo del login (2026-09-01, tercer rediseño —
+   feedback real de Facundo mirando producción: "se ve horrible, el
+   logo mal puesto, un efecto simple, feo IA"). Se sacaron las dos
+   manchas de color difuminadas (::before/::after de la versión
+   anterior) — es EXACTAMENTE el patrón que la skill anti-ia marca como
+   genérico ("gradiente + blobs de color con blur"), el mismo look de
+   cualquier landing de SaaS armada con IA. En su lugar: una grilla de
+   puntos finos (mismo lenguaje que bg-one-dots del resto del panel,
+   ver tailwind.config.ts, pero en blanco tenue para fondo oscuro en
+   vez de oscuro tenue para fondo claro) — da textura real sin apoyarse
+   en un efecto de blur. El isotipo de ONE se mantiene (es la marca de
+   la plataforma, no relleno genérico, ver SISTEMA_DISENO_LANDING →
+   "Elemento insignia") pero más chico y anclado abajo a la derecha en
+   vez de centrado como un blob gigante flotando solo. */
 .login-panel-bg {
-  background: linear-gradient(160deg, #241f2c 0%, #150f1c 45%, #000000 100%);
-}
-.login-panel-bg::before,
-.login-panel-bg::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  border-radius: 9999px;
-  pointer-events: none;
-}
-.login-panel-bg::before {
-  top: -15vmin;
-  right: -15vmin;
-  width: 55vmin;
-  height: 55vmin;
-  background: rgba(225, 123, 215, 0.3); /* one-fucsia */
-  filter: blur(90px);
-}
-.login-panel-bg::after {
-  bottom: -20vmin;
-  left: -15vmin;
-  width: 60vmin;
-  height: 60vmin;
-  background: rgba(107, 225, 227, 0.22); /* one-cian */
-  filter: blur(90px);
+  background:
+    radial-gradient(circle, rgba(254, 254, 255, 0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(160deg, #26202f 0%, #16101d 45%, #000000 100%);
 }
 
 /* Entrada escalonada de listas/grids (tarjetas de stats, filas de

@@ -54,7 +54,7 @@ function BotonSubmit({ texto, textoPendiente }: { texto: string; textoPendiente:
     <button
       type="submit"
       disabled={pending}
-      className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-one-fucsia px-6 py-3 text-sm font-bold text-one-negro transition-transform duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+      className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-one-fucsia px-6 py-3 text-sm font-bold text-one-negro transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-one-fucsia disabled:pointer-events-none disabled:opacity-60"
     >
       {pending ? (
         textoPendiente
@@ -111,7 +111,7 @@ function FormRegistro() {
           oscuro (invisible acá) a blanco tenue. */}
       <AvatarPicker
         name="avatar"
-        claseTitulo="text-sm font-semibold text-one-blanco/80"
+        claseTitulo="text-xs font-bold tracking-wide text-one-blanco/50 uppercase"
         claseAyuda="text-one-blanco/40"
         claseAnilloInactivo="ring-one-blanco/20"
       />
@@ -131,54 +131,63 @@ export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boo
   return (
     <div className="relative min-h-svh overflow-hidden bg-one-oscuro md:h-svh">
       <div className="relative grid min-h-svh md:h-svh md:grid-cols-[3fr_2fr]">
-        {/* Panel izquierdo — marca + propuesta, nítido. */}
-        <div className="login-panel-bg rise-in relative flex h-56 flex-col justify-between overflow-hidden p-6 md:h-full md:p-12">
-          {/* Isotipo de ONE gigante y tenue (2026-08-31, rediseño — sin
-              esto el espacio entre el logo y el texto de abajo quedaba
-              vacío en pantallas grandes de verdad). No es relleno
-              genérico: es la marca de la plataforma, a propósito
-              enorme y de fondo — mismo criterio que "elemento
-              insignia" del sistema de diseño de landings. */}
+        {/* Panel izquierdo — marca + propuesta, nítido. Un solo bloque
+            centrado (2026-09-01, rediseño — antes el logo vivía arriba
+            del todo y la copy abajo del todo, con "justify-between"
+            forzando un hueco enorme y vacío en el medio en pantallas
+            grandes de verdad: eso era "el logo mal puesto" que marcó
+            Facundo, no el logo en sí). Ahora el logo es el primer
+            elemento del MISMO bloque que el resto — se lee como una
+            sola composición, no dos piezas sueltas en los extremos. */}
+        <div className="login-panel-bg rise-in relative flex h-64 flex-col justify-center overflow-hidden p-6 md:h-full md:p-14">
+          {/* Isotipo de ONE (2026-09-01, más chico y anclado — antes
+              era un blob centrado gigantesco, ahora vive en la esquina
+              como una marca de agua real, sin competir con el logo ni
+              con el texto). Sigue siendo la marca de la plataforma, no
+              relleno genérico — ver SISTEMA_DISENO_LANDING → "Elemento
+              insignia". */}
           <Image
             src="/logos/one/logo-isotipo.webp"
             alt=""
-            width={900}
-            height={900}
+            width={640}
+            height={640}
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 right-[-12%] size-[65vmin] max-w-none -translate-y-1/2 opacity-[0.14] mix-blend-screen md:size-[52vw]"
+            className="pointer-events-none absolute -right-[8vmin] -bottom-[8vmin] size-[38vmin] max-w-none opacity-[0.16] mix-blend-screen md:size-[30vmin]"
           />
 
           <div className="relative">
-            <LogoEscencial heightPx={64} />
-          </div>
+            <LogoEscencial heightPx={56} />
 
-          <div className="relative hidden md:block">
-            <p className="mb-4 inline-block rounded-full border border-one-cian/25 bg-one-cian/10 px-3.5 py-1 text-xs font-bold tracking-widest text-one-cian uppercase">
-              Panel de administración
-            </p>
-            <h2 className="max-w-md text-3xl leading-tight font-extrabold tracking-tight text-one-blanco lg:text-4xl">
-              Landings y emails
-              <br />
-              <span className="bg-gradient-to-r from-one-fucsia to-one-cian bg-clip-text text-transparent">
-                en un solo lugar.
-              </span>
-            </h2>
-            <p className="mt-3 max-w-sm text-sm font-medium text-one-blanco/70">
-              Creá landings desde plantillas reutilizables, seguí a los leads y automatizá el
-              seguimiento por email — todo desde acá.
-            </p>
-            <div className="mt-8 flex flex-col gap-3">
-              <div className="flex items-center gap-3 text-sm text-one-blanco/70">
-                <span className="size-2 shrink-0 rounded-full bg-one-cian" />
-                Plantillas de landing reutilizables
-              </div>
-              <div className="flex items-center gap-3 text-sm text-one-blanco/70">
-                <span className="size-2 shrink-0 rounded-full bg-one-fucsia" />
-                Seguimiento automático por email
-              </div>
-              <div className="flex items-center gap-3 text-sm text-one-blanco/70">
-                <span className="size-2 shrink-0 rounded-full bg-one-dorado" />
-                Tracking de clicks a WhatsApp
+            <div className="mt-10 hidden md:block">
+              <p className="mb-4 inline-block rounded-full border border-one-cian/25 bg-one-cian/10 px-3.5 py-1 text-xs font-bold tracking-widest text-one-cian uppercase">
+                Panel de administración
+              </p>
+              <h2 className="max-w-md text-3xl leading-tight font-extrabold tracking-tight text-one-blanco lg:text-4xl">
+                Landings y emails
+                <br />
+                <span className="bg-gradient-to-r from-one-fucsia to-one-cian bg-clip-text text-transparent">
+                  en un solo lugar.
+                </span>
+              </h2>
+              <p className="mt-3 max-w-sm text-sm font-medium text-one-blanco/70">
+                Creá landings desde plantillas reutilizables, seguí a los leads y automatizá el
+                seguimiento por email — todo desde acá.
+              </p>
+              <div className="mt-8 flex flex-col gap-3">
+                {[
+                  { color: 'bg-one-cian', texto: 'Plantillas de landing reutilizables' },
+                  { color: 'bg-one-fucsia', texto: 'Seguimiento automático por email' },
+                  { color: 'bg-one-dorado', texto: 'Tracking de clicks a WhatsApp' },
+                ].map((item, i) => (
+                  <div
+                    key={item.texto}
+                    style={{ '--stagger-index': i } as React.CSSProperties}
+                    className="stagger-in flex items-center gap-3 text-sm text-one-blanco/70"
+                  >
+                    <span className={`size-2 shrink-0 rounded-full ${item.color}`} />
+                    {item.texto}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -194,14 +203,26 @@ export function LoginScreen({ mostrarRegistro = false }: { mostrarRegistro?: boo
           <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
             <LogoEscencial heightPx={48} className="mx-auto mb-8 md:hidden" />
 
-            <h1 className="bg-gradient-to-r from-one-fucsia to-one-cian bg-clip-text text-2xl font-extrabold text-transparent">
+            {/* Texto sólido acá, no gradiente (2026-09-01) — el gradient-text
+                ya es el gesto del panel izquierdo ("en un solo lugar.");
+                repetirlo en cada título de la pantalla es justo el patrón
+                que marca la skill anti-ia (el mismo efecto especial en
+                todos lados deja de leerse como especial). */}
+            <h1 key={`${modo}-h1`} className="rise-in text-2xl font-extrabold text-one-blanco">
               {modo === 'login' ? 'Bienvenido' : 'Creá tu cuenta'}
             </h1>
-            <p className="mt-1 text-sm text-one-lavanda">
+            <p key={`${modo}-sub`} className="rise-in mt-1 text-sm text-one-lavanda">
               {modo === 'login' ? 'Ingresá tus credenciales para continuar.' : 'Acceso completo al panel de administración.'}
             </p>
 
-            {modo === 'login' ? <FormLogin /> : <FormRegistro />}
+            {/* key={`${modo}-form`} (2026-09-01) — antes el swap entre
+                login/registro era un corte seco, sin transición. React
+                desmonta/remonta el form completo al cambiar la key, y
+                rise-in (misma animación de entrada que ya usa el resto del
+                panel) le da una entrada real en vez de un salto. */}
+            <div key={`${modo}-form`} className="rise-in">
+              {modo === 'login' ? <FormLogin /> : <FormRegistro />}
+            </div>
 
             {mostrarRegistro && (
               <button
