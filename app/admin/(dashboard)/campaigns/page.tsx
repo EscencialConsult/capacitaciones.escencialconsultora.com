@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Pencil, Contact, Pause, Archive } from 'lucide-react';
+import { Pencil, Contact, Pause, Archive, Zap } from 'lucide-react';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { ActivateButton } from './ActivateButton';
 import { CampaignStatusButton } from './CampaignStatusButton';
@@ -28,6 +28,16 @@ const textoEstado: Record<string, string> = {
   archived: 'Archivada',
 };
 
+// Vinculaciones (2026-09-01, ítem 4 del backlog del 28/8) — el color
+// del rayo refleja qué tan cerca está el DUEÑO de la campaña (no la
+// campaña en sí — el crédito es del admin, compartido entre todas sus
+// campañas) de agotar su crédito del ciclo. Mismos cortes que
+// CreditosBadge en DashboardHeader.tsx (80%/100%), para no inventar
+// una escala nueva.
+function colorSegunPorcentaje(porcentaje: number): string {
+  return porcentaje >= 100 ? 'text-one-rojo' : porcentaje >= 80 ? 'text-one-dorado' : 'text-emerald-600';
+}
+
 // Acá viven TODAS las campañas — asesora, WhatsApp, los 4 emails, qué
 // diseño usa, y los leads que capturó. A diferencia del diseño viejo,
 // una campaña NUNCA desaparece de acá por activarse: sigue siendo la
@@ -40,9 +50,31 @@ export default async function CampaignsPage() {
   const { data: campanas } = await supabase
     .from('campaigns')
     .select(
-      'id, name, status, landing_categories(name), landings(slug, name, landing_templates(name)), landing_email_steps(count)'
+      'id, name, status, activated_by, landing_categories(name), landings(slug, name, landing_templates(name)), landing_email_steps(count)'
     )
     .order('created_at', { ascending: false });
+
+  // Vinculaciones (2026-09-01) — un solo round-trip agrupado para el
+  // consumo POR CAMPAÑA (ver migración 0037), y uno por DUEÑO único
+  // (no por campaña — varias campañas pueden compartir el mismo dueño,
+  // llamar creditos_mensuales_de/usados_ciclo_actual una vez por fila
+  // sería repetir la misma consulta varias veces sin necesidad).
+  const { data: consumoCampanas } = await supabase.rpc('creditos_por_campana_ciclo_actual');
+  const consumoPorCampana = new Map<string, number>(
+    ((consumoCampanas ?? []) as { campaign_id: string; creditos: number }[]).map((r) => [r.campaign_id, r.creditos])
+  );
+
+  const duenosUnicos = Array.from(new Set((campanas ?? []).map((c) => c.activated_by).filter((id): id is string => !!id)));
+  const creditosPorDueno = new Map<string, { total: number; usado: number }>();
+  await Promise.all(
+    duenosUnicos.map(async (duenoId) => {
+      const [{ data: total }, { data: usado }] = await Promise.all([
+        supabase.rpc('creditos_mensuales_de', { p_user_id: duenoId }),
+        supabase.rpc('creditos_usados_ciclo_actual', { p_user_id: duenoId }),
+      ]);
+      creditosPorDueno.set(duenoId, { total: total ?? 0, usado: usado ?? 0 });
+    })
+  );
 
   return (
     <div>
@@ -63,7 +95,7 @@ export default async function CampaignsPage() {
       </div>
 
       <TableShell>
-        <TableHead columns={['Nombre', 'Categoría', 'Landing', 'Plantilla', 'Estado', 'Emails cargados', 'Acciones']} />
+        <TableHead columns={['Nombre', 'Categoría', 'Landing', 'Plantilla', 'Estado', 'Emails cargados', 'Crédito', 'Acciones']} />
         <tbody>
             {(campanas ?? []).map((c, i) => {
               const landing = c.landings as unknown as {
@@ -111,6 +143,36 @@ export default async function CampaignsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-one-oscuro/60">{cantidadEmails}</td>
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const consumo = consumoPorCampana.get(c.id) ?? 0;
+                      const dueno = c.activated_by ? creditosPorDueno.get(c.activated_by) : null;
+
+                      if (!c.activated_by) {
+                        return (
+                          <span title="Sin dueño asignado (activada antes del sistema de créditos por admin).">
+                            <Zap className="size-4 text-one-oscuro/20" strokeWidth={1.75} />
+                          </span>
+                        );
+                      }
+                      if (!dueno || dueno.total === 0) {
+                        return (
+                          <span title="El dueño de esta campaña no tiene ninguna cuenta de envío conectada.">
+                            <Zap className="size-4 text-one-oscuro/20" strokeWidth={1.75} />
+                          </span>
+                        );
+                      }
+
+                      const porcentaje = Math.round((dueno.usado / dueno.total) * 100);
+                      return (
+                        <span
+                          title={`Esta campaña consumió ${consumo.toLocaleString('es-AR')} créditos este ciclo. Su dueño usó ${dueno.usado.toLocaleString('es-AR')} de ${dueno.total.toLocaleString('es-AR')} en total (${porcentaje}%).`}
+                        >
+                          <Zap className={`size-4 ${colorSegunPorcentaje(porcentaje)}`} strokeWidth={1.75} />
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       {/* Siempre visible — si la campaña ya no está en
@@ -167,7 +229,7 @@ export default async function CampaignsPage() {
               );
             })}
             {(campanas ?? []).length === 0 && (
-              <TableEmptyRow colSpan={7}>No hay ninguna campaña todavía. Creá una nueva para arrancar.</TableEmptyRow>
+              <TableEmptyRow colSpan={8}>No hay ninguna campaña todavía. Creá una nueva para arrancar.</TableEmptyRow>
             )}
           </tbody>
       </TableShell>

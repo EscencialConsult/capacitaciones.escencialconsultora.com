@@ -52,12 +52,21 @@ export type VentaCruda = {
  */
 function parsearMarcaTemporal(valor: string): Date | null {
   const m = valor.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (!m) return null;
-  const [, dd, mm, yyyy, hh, min, ss] = m;
-  const fecha = new Date(
-    Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh) + 3, Number(min), ss ? Number(ss) : 0)
-  );
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  if (m) {
+    const [, dd, mm, yyyy, hh, min, ss] = m;
+    const fecha = new Date(
+      Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh) + 3, Number(min), ss ? Number(ss) : 0)
+    );
+    if (!Number.isNaN(fecha.getTime())) return fecha;
+  }
+  // Fallback (2026-09-01) — si la celda de origen es una fecha REAL (no
+  // texto), Apps Script serializa ese Date como ISO 8601 al pasar por
+  // JSON.stringify ("2026-06-23T18:37:28.000Z"), no como "DD/MM/YYYY
+  // HH:MM:SS". `new Date(...)` interpreta ISO nativamente y sin
+  // ambigüedad de huso horario — cubre ese caso sin tener que saber de
+  // antemano cuál de los dos formatos va a mandar la planilla real.
+  const iso = new Date(valor);
+  return Number.isNaN(iso.getTime()) ? null : iso;
 }
 
 /** Parsea las filas crudas de la planilla (encabezado + datos) a VentaCruda[], salteando las que no tienen una Marca temporal parseable (sin eso no hay clave de dedupe posible). */
