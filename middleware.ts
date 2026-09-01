@@ -34,7 +34,13 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // tocarse — ya funciona igual sea cual sea el Host, porque es el mismo
 // deploy. Ver lib/dominio-landing.ts para cómo se crea cada subdominio.
 const DOMINIO_LANDINGS = 'escencialconsultora.com';
-const HOSTS_QUE_NO_SON_LANDING = new Set(['capacitaciones', 'www']);
+// 'login' (2026-09-01, pedido explícito: "que el login sea
+// login.escencialconsultora.com... y ese sea como el ingreso") — sin
+// esto, slugDesdeHost lo trataría como el slug de una landing
+// inexistente y reescribiría hacia /login (404), en vez de dejar pasar
+// la raíz normal (el mismo form de login/registro de siempre, ver
+// app/page.tsx y el bloque `esRaiz` más abajo).
+const HOSTS_QUE_NO_SON_LANDING = new Set(['capacitaciones', 'www', 'login']);
 
 function slugDesdeHost(host: string | null): string | null {
   if (!host) return null;

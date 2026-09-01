@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const TABS = [
   { href: '/admin/ventas', label: 'Analítica', exact: true },
   { href: '/admin/ventas/revisar', label: 'Revisar y sincronizar', exact: false },
+  { href: '/admin/ventas/historial', label: 'Historial', exact: false },
 ];
 
 /**
