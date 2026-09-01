@@ -33,8 +33,8 @@ type LeadSugerido = {
 type Paso = 'sugerencia' | 'buscando' | 'hecho_confirmada' | 'hecho_rechazada';
 
 /**
- * Una fila de la cola de revisión (2026-09-01, ver /admin/ventas) —
- * dos pasos separados, pedido explícito de Facundo: (1) ¿es esta
+ * Una fila de la cola de revisión (2026-09-01, ver /admin/ventas/revisar)
+ * — dos pasos separados, pedido explícito de Facundo: (1) ¿es esta
  * persona?, y si no, (2) buscar a mano. Confirmar un lead ya confirma
  * su campaña también — un lead vive en UNA sola campaña (ver
  * leads.campaign_id), así que no hace falta un tercer paso de "elegir

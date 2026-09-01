@@ -35,6 +35,10 @@ export async function confirmarVenta(ventaId: string, leadId: string, campaignId
     return { error: 'Esta venta ya no está pendiente — otra persona la revisó, o vos mismo hace un segundo.' };
   }
 
+  // Las dos rutas de /admin/ventas (2026-09-01, ver VentasTabs.tsx) —
+  // esta revalida su propia cola Y la pestaña de analítica, que
+  // también muestra el conteo de confirmadas/pendientes.
+  revalidatePath('/admin/ventas/revisar');
   revalidatePath('/admin/ventas');
   revalidatePath('/admin', 'layout');
   return { ok: true as const };
@@ -63,6 +67,7 @@ export async function rechazarVenta(ventaId: string) {
     return { error: 'Esta venta ya no está pendiente.' };
   }
 
+  revalidatePath('/admin/ventas/revisar');
   revalidatePath('/admin/ventas');
   revalidatePath('/admin', 'layout');
   return { ok: true as const };
