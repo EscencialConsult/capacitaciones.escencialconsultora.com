@@ -107,11 +107,11 @@ export function VentaDetalleModal({
                 <p className="text-sm font-semibold text-one-oscuro">
                   {lead.first_name} {lead.last_name}
                 </p>
-                <p className="mt-0.5 text-xs text-one-oscuro/60">
+                <p className="mt-0.5 text-sm font-semibold text-one-oscuro">
                   {lead.email ?? '—'} {lead.phone ? `· ${lead.phone}` : ''}
                 </p>
-                <p className="mt-1 text-xs text-one-oscuro/50">
-                  Campaña <span className="font-semibold text-one-oscuro/70">{lead.campaigns?.name ?? '—'}</span>
+                <p className="mt-1 text-sm text-one-oscuro/80">
+                  Campaña <span className="font-bold text-one-oscuro">{lead.campaigns?.name ?? '—'}</span>
                   {lead.campaigns?.landings?.name && ` (landing: ${lead.campaigns.landings.name})`} — entró el{' '}
                   {formatFechaHoraAR(lead.created_at)}
                 </p>
@@ -156,11 +156,11 @@ export function VentaDetalleModal({
                         onClick={() => confirmar(l.id, l.campaign_id)}
                         className="rounded-one-sm border border-one-oscuro/10 bg-one-blanco px-4 py-2.5 text-left text-sm transition-colors duration-150 hover:border-one-fucsia/40 hover:bg-one-fucsia/5 disabled:pointer-events-none disabled:opacity-50"
                       >
-                        <span className="font-semibold text-one-oscuro">
+                        <span className="font-bold text-one-oscuro">
                           {l.first_name} {l.last_name}
                         </span>
-                        <span className="ml-2 text-xs text-one-oscuro/50">{l.email ?? l.phone ?? 'sin contacto'}</span>
-                        <span className="mt-0.5 block text-xs text-one-oscuro/40">
+                        <span className="ml-2 text-sm font-semibold text-one-oscuro/80">{l.email ?? l.phone ?? 'sin contacto'}</span>
+                        <span className="mt-0.5 block text-sm text-one-oscuro/70">
                           {l.campaign_name} — entró el {formatFechaHoraAR(l.created_at)}
                         </span>
                       </button>
@@ -196,13 +196,13 @@ export function VentaDetalleModal({
               <p className="text-sm font-semibold text-one-oscuro">
                 {venta.nombre ?? 'Sin nombre'} {venta.apellido ?? ''}
               </p>
-              <p className="mt-0.5 text-sm text-one-oscuro/60">{venta.programa ?? 'Sin programa especificado'}</p>
-              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-one-oscuro/50">
+              <p className="mt-0.5 text-sm font-semibold text-one-oscuro/90">{venta.programa ?? 'Sin programa especificado'}</p>
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-one-oscuro/80">
                 {venta.email && <span>{venta.email}</span>}
                 {venta.celular && <span>{venta.celular}</span>}
                 {venta.dni && <span>DNI {venta.dni}</span>}
                 {venta.origen && <span>Origen: {venta.origen}</span>}
-                {venta.monto && <span className="font-semibold text-one-oscuro/70">{venta.monto}</span>}
+                {venta.monto && <span className="font-bold text-one-oscuro">{venta.monto}</span>}
                 <span>{formatFechaHoraAR(venta.marca_temporal)}</span>
               </div>
             </div>
