@@ -252,6 +252,14 @@ export async function ingerirVentas(
       lead_id_sugerido: match.leadId,
       campaign_id_sugerido: match.campaignId,
       senales: match.senales,
+      // 'sin_coincidencia' en vez de 'pendiente' (2026-09-01, pedido
+      // explícito: "si el sistema no detecta matcheo... no debería
+      // mostrármelo como notificación, son gente que compró desde
+      // otros medios") — sigue guardándose el dato, pero no cuenta
+      // como algo a revisar: el badge del sidebar, la analítica y la
+      // cola de /revisar filtran por estado='pendiente' en todos
+      // lados, así que alcanza con no ponerle ese estado acá.
+      estado: match.senales.length === 0 ? 'sin_coincidencia' : 'pendiente',
     });
     // unique_violation en marca_temporal = otra corrida concurrente ya
     // la insertó justo antes — no es un error real, se ignora.
