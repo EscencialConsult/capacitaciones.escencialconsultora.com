@@ -545,8 +545,13 @@ async function marcarError(
  * corrida (el cron corre cada 1 hora — sin esto la tabla se llenaría de
  * filas idénticas). resolved_at se vuelve a poner en null en cada llamada,
  * así una fila resuelta a mano que vuelve a fallar se reabre sola.
+ *
+ * Exportada (2026-08-31) — la reusa también app/api/ventas-sync/route.ts
+ * para dejar rastro cuando el sync automático de ventas no encuentra
+ * columna de email o no matchea nada, algo que de otra forma quedaría
+ * enterrado en los logs de ejecución de un Apps Script que nadie revisa.
  */
-async function registrarAlerta(
+export async function registrarAlerta(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
   source: string,
   mensaje: string
