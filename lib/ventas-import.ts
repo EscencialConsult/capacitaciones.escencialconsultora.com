@@ -159,12 +159,21 @@ export async function matchearVenta(supabase: SupabaseServiceClient, venta: Vent
       .select('id, name, activated_at, deactivated_at')
       .not('activated_at', 'is', null);
 
-    const candidatas = (campanas ?? [])
+    const conPuntaje = (campanas ?? [])
       .filter((c) => fechaDentroDeVentana(venta.marcaTemporal, c.activated_at, c.deactivated_at))
       .map((c) => ({ ...c, puntaje: palabrasComunes(c.name, venta.programa!) }))
-      .filter((c) => c.puntaje > 0)
-      .sort((a, b) => b.puntaje - a.puntaje)
-      .slice(0, 3);
+      .filter((c) => c.puntaje > 0);
+
+    // Empate en el puntaje más alto = ambiguo, no se adivina (bug real
+    // encontrado probando con datos de prueba, 2026-09-01: varias
+    // campañas de test de Facundo comparten palabras genéricas como
+    // "Prueba", y sin este chequeo el orden entre empatadas era
+    // esencialmente arbitrario — mismo criterio que "más de un
+    // candidato por teléfono" más arriba: mejor no sugerir que
+    // sugerir mal.
+    const maxPuntaje = conPuntaje.length > 0 ? Math.max(...conPuntaje.map((c) => c.puntaje)) : 0;
+    const ganadoras = conPuntaje.filter((c) => c.puntaje === maxPuntaje);
+    const candidatas = ganadoras.length === 1 ? ganadoras : [];
 
     for (const candidata of candidatas) {
       const { data: leadsDeCampana } = await supabase
