@@ -4,6 +4,28 @@ import { cookies } from 'next/headers';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+// Bug real confirmado en producción (2026-09-02) — una landing recién
+// creada (con is_active/campaña activa correctos en la base, verificado
+// a mano) seguía devolviendo 404 "todavía no tiene ninguna campaña
+// activa" un buen rato después de activarla, en TODAS sus formas de
+// acceso (path clásico y subdominio propio). `export const dynamic =
+// 'force-dynamic'` en app/[slug]/route.ts ya estaba puesto, pero el
+// runtime de Next.js en Netlify (@netlify/plugin-nextjs) intercepta
+// automáticamente cada `fetch()` — incluido el que usa @supabase/
+// supabase-js por debajo — con su propia caché durable (Netlify Blobs),
+// una capa AL MARGEN de si el segmento de ruta está marcado dinámico.
+// El síntoma coincidía exacto con la ventana real: la landing quedó
+// pública (subdominio ya publicado) unos 27 minutos ANTES de activar
+// su campaña — el primer 404 (legítimo en ese momento) quedó cacheado
+// ahí y nunca se refrescó solo. Un rebuild con caché limpia lo arregló
+// una vez, pero eso no evita que le pase a la PRÓXIMA landing nueva.
+// Fix real: pasarle a los dos clientes un fetch propio que siempre
+// pide 'no-store' — ninguna capa de caché (Next.js ni la de Netlify)
+// puede interceptar algo que ya viene marcado así desde el pedido.
+function fetchSinCache(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, { ...init, cache: 'no-store' });
+}
+
 /**
  * Cliente de Supabase para usar en Server Components, Route Handlers y
  * Server Actions — respeta la sesión del usuario logueado (RLS activo,
@@ -17,6 +39,7 @@ export function createSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: fetchSinCache },
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -70,6 +93,6 @@ export function createSupabaseServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
+    { auth: { persistSession: false }, global: { fetch: fetchSinCache } }
   );
 }
