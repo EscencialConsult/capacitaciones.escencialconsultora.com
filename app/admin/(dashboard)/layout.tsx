@@ -64,7 +64,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // único elemento reutilizado por TODA la zona /admin, no por página —
     // primer load liviano (solo CSS, nada de JS ni imagen), consistente con
     // el resto del shell (sidebar/header ya viven acá, no por pantalla).
-    <div className="admin-glow relative flex min-h-svh overflow-hidden bg-one-blanco">
+    // h-svh (no min-h-svh) + overflow-hidden acá (2026-09-02, bug real
+    // confirmado: en una pantalla con contenido largo —como Ventas, con
+    // varios gráficos apilados— el sidebar se veía "roto", con un hueco
+    // negro enorme entre los últimos ítems del menú y el pie de perfil.
+    // Causa: con min-h-svh este contenedor podía CRECER más alto que el
+    // viewport (min-height no pone techo), y sin nada topeándolo, era la
+    // página entera la que scrolleaba — el <aside> (h-svh fijo, pero SIN
+    // sticky/fixed) se iba para arriba junto con todo lo demás en vez de
+    // quedarse quieto. h-svh acá pone un techo real: el contenedor nunca
+    // crece más que el viewport, así que el que scrollea es el <main>
+    // (ya tenía su propio overflow-y-auto, ver más abajo) y el sidebar
+    // (mismo overflow-y-auto propio) queda fijo siempre en su lugar.
+    <div className="admin-glow relative flex h-svh overflow-hidden bg-one-blanco">
       <div className="relative z-10 flex w-full">
         <DashboardSidebar
           avatar={avatar}
